@@ -12,6 +12,16 @@ export interface CreateCaseRequest {
   location: string;
   victimAge?: number;
   urgencyLevel: 'immediate' | 'urgent' | 'normal';
+  suspectedGroomAge?: number;
+  familyInvolved: boolean;
+  witnessesAvailable: boolean;
+  evidenceDescription?: string;
+  marriageScheduledDate?: Date;
+  interventionRequired: boolean;
+  lawEnforcementNotified: boolean;
+  socialWorkerAssigned?: string;
+  courtOrderRequired: boolean;
+  rescueOperationNeeded: boolean;
 }
 
 export interface UpdateCaseRequest {
@@ -45,7 +55,7 @@ export class CaseService extends BaseApiService {
     return this.put<Issue>(endpoints.cases.update(id), request);
   }
 
-  async delete(id: string): Promise<void> {
+  async deleteCase(id: string): Promise<void> {
     return this.delete<void>(endpoints.cases.delete(id));
   }
 

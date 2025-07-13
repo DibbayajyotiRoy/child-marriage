@@ -34,7 +34,7 @@ export class ReportService extends BaseApiService {
     return this.put<Report>(endpoints.reports.update(id), request);
   }
 
-  async delete(id: string): Promise<void> {
+  async deleteReport(id: string): Promise<void> {
     return this.delete<void>(endpoints.reports.delete(id));
   }
 

@@ -6,6 +6,7 @@ import { Person } from '@/types';
 export interface CreatePersonRequest {
   name: string;
   email: string;
+  role: 'person';
   departmentId: string;
 }
 
@@ -42,7 +43,7 @@ export class PersonService extends BaseApiService {
     return this.put<Person>(endpoints.persons.update(id), request);
   }
 
-  async delete(id: string): Promise<void> {
+  async deletePerson(id: string): Promise<void> {
     return this.delete<void>(endpoints.persons.delete(id));
   }
 
