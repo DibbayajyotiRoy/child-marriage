@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { personService, adminService } from '@/api';
 
 export type UserRole = 'superadmin' | 'person' | 'police' | 'dice' | 'admin';
 
@@ -21,7 +21,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo purposes
+// Mock users for demo purposes - will be replaced with API calls
 const MOCK_USERS: User[] = [
   { id: '1', name: 'Super Admin', email: 'admin@system.com', role: 'superadmin' },
   { id: '2', name: 'John Doe', email: 'john@tech.com', role: 'person', departmentId: '1', departmentName: 'Technical' },
@@ -35,25 +35,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
+    const savedToken = localStorage.getItem('authToken');
+    if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
     }
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - in real app, this would be an API call
-    const foundUser = MOCK_USERS.find(u => u.email === email);
-    if (foundUser && password === 'password') {
-      setUser(foundUser);
-      localStorage.setItem('user', JSON.stringify(foundUser));
+    try {
+      // Try admin login first
+      if (email.includes('admin')) {
+        const response = await adminService.login({ email, password });
+        const userData: User = {
+          id: response.admin.id,
+          name: response.admin.name,
+          email: response.admin.email,
+          role: response.admin.role,
+        };
+        
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('authToken', response.token);
+        return true;
+      }
+
+      // Try person login
+      const response = await personService.login({ email, password });
+      const userData: User = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        role: response.user.role,
+        departmentId: response.user.departmentId,
+        departmentName: response.user.departmentName,
+      };
+      
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('authToken', response.token);
       return true;
+    } catch (error) {
+      // Fallback to mock authentication for demo
+      console.warn('API login failed, using mock authentication:', error);
+      const foundUser = MOCK_USERS.find(u => u.email === email);
+      if (foundUser && password === 'password') {
+        setUser(foundUser);
+        localStorage.setItem('user', JSON.stringify(foundUser));
+        localStorage.setItem('authToken', 'mock-token');
+        return true;
+      }
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
   };
 
   return (
