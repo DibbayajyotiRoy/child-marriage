@@ -91,7 +91,7 @@ npm run dev
 text
 
 **Requirements:**  
-- Node.js & npm (install via [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- Node.js & npm (install via [nvm](https://github.com/DibbayajyotiRoy/child-marriage))
 
 ### 2. Edit Directly in GitHub
 
