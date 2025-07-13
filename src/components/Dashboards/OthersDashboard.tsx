@@ -22,10 +22,14 @@ import {
 export function OthersDashboard() {
   const { issues, reports } = useMockData();
   
-  const activeCases = issues.filter(c => c.status === 'active').length;
-  const pendingCases = issues.filter(c => c.status === 'pending').length;
-  const resolvedCases = issues.filter(c => c.status === 'resolved').length;
-  const totalReports = reports.length;
+  // Handle case where issues might be undefined initially
+  const safeIssues = issues || [];
+  const safeReports = reports || [];
+  
+  const activeCases = safeIssues.filter(c => c.status === 'active').length;
+  const pendingCases = safeIssues.filter(c => c.status === 'pending').length;
+  const resolvedCases = safeIssues.filter(c => c.status === 'resolved').length;
+  const totalReports = safeReports.length;
 
   const handleAutoCreateTeam = async (caseId: string) => {
     try {
@@ -109,13 +113,13 @@ export function OthersDashboard() {
                 Recent Cases
               </h3>
               <Badge variant="secondary" className="bg-primary/10 text-primary">
-                {issues.length} Total
+                {safeIssues.length} Total
               </Badge>
             </div>
           </div>
           
           <div className="p-6 space-y-4 max-h-80 overflow-y-auto">
-            {issues.slice(0, 5).map((case_) => (
+            {safeIssues.slice(0, 5).map((case_) => (
               <div key={case_.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
                 <div className="space-y-1">
                   <div className="font-medium text-sm">{case_.title}</div>
