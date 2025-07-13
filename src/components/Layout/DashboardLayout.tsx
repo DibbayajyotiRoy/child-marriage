@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AnimatedBackground } from '@/components/ui/animated-background';
+import { NotificationModal } from '@/components/ui/notification-modal';
+import { useMockData } from '@/hooks/useMockData';
 import { LogOut, User, Bell } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -14,6 +16,13 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, sidebar, title }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
+  const { issues } = useMockData();
+  const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+  
+  // Count active and pending issues for notification badge
+  const activeIssuesCount = issues.filter(issue => 
+    issue.status === 'active' || issue.status === 'pending'
+  ).length;
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -33,11 +42,20 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
           
           <div className="flex items-center gap-3">
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-accent/80 transition-all duration-200 hover:scale-105 relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 rounded-full hover:bg-accent/80 transition-all duration-200 hover:scale-105 relative"
+              onClick={() => setNotificationModalOpen(true)}
+            >
               <Bell className="h-4 w-4" />
-              <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-xs text-white font-bold">3</span>
-              </div>
+              {activeIssuesCount > 0 && (
+                <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">
+                    {activeIssuesCount > 9 ? '9+' : activeIssuesCount}
+                  </span>
+                </div>
+              )}
             </Button>
             
             <ThemeToggle />
@@ -83,6 +101,13 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
           </div>
         </main>
       </div>
+
+      {/* Notification Modal */}
+      <NotificationModal
+        open={notificationModalOpen}
+        onOpenChange={setNotificationModalOpen}
+        issues={issues}
+      />
     </div>
   );
 }

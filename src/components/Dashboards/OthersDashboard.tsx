@@ -20,18 +20,18 @@ import {
 } from 'lucide-react';
 
 export function OthersDashboard() {
-  const { cases, reports } = useMockData();
+  const { issues, reports } = useMockData();
   
-  const activeCases = cases.filter(c => c.status === 'active').length;
-  const pendingCases = cases.filter(c => c.status === 'pending').length;
-  const resolvedCases = cases.filter(c => c.status === 'resolved').length;
+  const activeCases = issues.filter(c => c.status === 'active').length;
+  const pendingCases = issues.filter(c => c.status === 'pending').length;
+  const resolvedCases = issues.filter(c => c.status === 'resolved').length;
   const totalReports = reports.length;
 
   const handleAutoCreateTeam = async (caseId: string) => {
     try {
       await caseService.assignTeam(caseId, {
-        leaderId: "person-1",
-        memberIds: ["person-2", "person-3"]
+        teamId: "team-1",
+        notes: "Auto-created team for urgent case"
       });
       console.log('Auto team created for case:', caseId);
     } catch (error) {
@@ -109,18 +109,18 @@ export function OthersDashboard() {
                 Recent Cases
               </h3>
               <Badge variant="secondary" className="bg-primary/10 text-primary">
-                {cases.length} Total
+                {issues.length} Total
               </Badge>
             </div>
           </div>
           
           <div className="p-6 space-y-4 max-h-80 overflow-y-auto">
-            {cases.slice(0, 5).map((case_) => (
+            {issues.slice(0, 5).map((case_) => (
               <div key={case_.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
                 <div className="space-y-1">
                   <div className="font-medium text-sm">{case_.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {case_.location} • {case_.urgency} priority
+                    {case_.location} • {case_.urgencyLevel} priority
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
