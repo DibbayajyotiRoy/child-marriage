@@ -77,10 +77,10 @@ You can edit and run the frontend code using any of the following methods:
 To work locally:
 
 Clone the repository
-git clone <YOUR_GIT_URL>
+git clone https://github.com/DibbayajyotiRoy/child-marriage
 
 Navigate to the project directory
-cd <YOUR_PROJECT_NAME>
+cd child-marriage
 
 Install dependencies
 npm i
