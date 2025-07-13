@@ -72,13 +72,7 @@ This project delivers a full-featured, modern web application with **three disti
 
 You can edit and run the frontend code using any of the following methods:
 
-### 1. Use Lovable
-
-- Visit your [Lovable Project](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530).
-- Prompt for changes or use the visual editor.
-- All changes are auto-committed to this repository.
-
-### 2. Use Your Preferred IDE
+### 1. Use Your Preferred IDE
 
 To work locally:
 
@@ -99,13 +93,13 @@ text
 **Requirements:**  
 - Node.js & npm (install via [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
 
-### 3. Edit Directly in GitHub
+### 2. Edit Directly in GitHub
 
 - Navigate to the desired file(s).
 - Click the "Edit" (pencil) icon.
 - Make your changes and commit.
 
-### 4. Use GitHub Codespaces
+### 3. Use GitHub Codespaces
 
 - Go to the repository main page.
 - Click "Code" > "Codespaces" tab > "New codespace".
@@ -115,15 +109,14 @@ text
 
 ## Deployment
 
-- Deploy directly from [Lovable](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530):  
-  Click **Share → Publish** for instant deployment.
+- Deploy your application using your preferred hosting or CI/CD platform.
 
 ---
 
 ## Custom Domain
 
-- Connect a custom domain via Project > Settings > Domains > Connect Domain.
-- See [Lovable docs](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide) for details.
+- Connect a custom domain via your hosting provider’s domain settings.
+- Configure DNS records as required by your deployment platform.
 
 ---
 
@@ -135,6 +128,6 @@ We welcome contributions! Please open issues or submit pull requests for improve
 
 ## Support
 
-For questions or support, please refer to the project’s main [Lovable page](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530) or contact the maintainers.
+For questions or support, please contact the maintainers or refer to the project documentation.
 
 ---
