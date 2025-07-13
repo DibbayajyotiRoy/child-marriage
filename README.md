@@ -1,73 +1,140 @@
-# Welcome to your Lovable project
+# Modern Issue Management Web Application – Frontend Documentation
 
-## Project info
+Welcome to the frontend codebase for your modern, role-based issue management web application.
 
-**URL**: https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530
+---
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+This project delivers a full-featured, modern web application with **three distinct dashboards**, each tailored to specific roles within an organization.  
+**Primary goal:** Manage, monitor, and resolve issues raised by external users—efficiently and in real time.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530) and start prompting.
+## 🔑 Key Dashboards & User Roles
 
-Changes made via Lovable will be committed automatically to this repo.
+### Superadmin Dashboard
+- **Purpose:** Manage entire system settings.
+- **Features:**
+  - CRUD operations for:
+    - Departments (e.g., Technical, Support, Field)
+    - Members (Persons working in departments)
+    - Police (special user group)
+    - DICE (another specialized user group)
+  - Administration roles and team hierarchy oversight.
 
-**Use your preferred IDE**
+### Person Dashboard (Department Members)
+- **Purpose:** Enable department members to manage issues.
+- **Features:**
+  - Sidebar navigation:
+    - Active Issues
+    - Pending Issues
+    - Resolved Issues
+  - For each issue:
+    - Open detailed view
+    - Submit progress reports
+    - Mark as resolved or escalate
+  - Focus on clarity and task prioritization.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Others Dashboard (Police, DICE, Admin Roles)
+- **Purpose:** Real-time monitoring and advanced team management.
+- **Features:**
+  - Monitor all system issues in real time.
+  - Form teams by grouping "Person" users from various departments.
+  - Assign issues to teams for resolution.
+  - Alerts for unnoticed or unassigned issues.
+  - Actionable analytics and graphs on unresolved issues, team performance, etc.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## 🌟 Core Features
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+- **Role-based authentication and authorization**
+- **Real-time notifications** for new, unassigned, or critical issues
+- **Team management** and role assignment workflows
+- **Issue tracking** with detailed status transitions
+- **Reporting module** for submitting analyses and resolutions
+- **Admin controls** for dynamic user and department management
+
+---
+
+## Technology Stack
+
+- [Vite](https://vitejs.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [React](https://react.dev/)
+- [shadcn-ui](https://ui.shadcn.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+
+---
+
+## Getting Started
+
+You can edit and run the frontend code using any of the following methods:
+
+### 1. Use Lovable
+
+- Visit your [Lovable Project](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530).
+- Prompt for changes or use the visual editor.
+- All changes are auto-committed to this repository.
+
+### 2. Use Your Preferred IDE
+
+To work locally:
+
+Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+Install dependencies
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Start the development server
 npm run dev
-```
 
-**Edit a file directly in GitHub**
+text
+
+**Requirements:**  
+- Node.js & npm (install via [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+
+### 3. Edit Directly in GitHub
 
 - Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Click the "Edit" (pencil) icon.
+- Make your changes and commit.
 
-**Use GitHub Codespaces**
+### 4. Use GitHub Codespaces
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Go to the repository main page.
+- Click "Code" > "Codespaces" tab > "New codespace".
+- Edit and commit changes within Codespaces.
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- Deploy directly from [Lovable](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530):  
+  Click **Share → Publish** for instant deployment.
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530) and click on Share -> Publish.
+## Custom Domain
 
-## Can I connect a custom domain to my Lovable project?
+- Connect a custom domain via Project > Settings > Domains > Connect Domain.
+- See [Lovable docs](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide) for details.
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Contributing
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+We welcome contributions! Please open issues or submit pull requests for improvements, bug fixes, or new features.
+
+---
+
+## Support
+
+For questions or support, please refer to the project’s main [Lovable page](https://lovable.dev/projects/9ec50553-58e8-4afe-b5f8-ce7e0da74530) or contact the maintainers.
+
+---
