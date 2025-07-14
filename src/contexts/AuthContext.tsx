@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { personService, adminService } from '@/api';
 
-export type UserRole = 'superadmin' | 'person' | 'police' | 'dice' | 'admin';
+export type UserRole = 'superadmin' | 'person' | 'police' | 'dise' | 'admin';
 
 export interface User {
   id: string;
@@ -26,7 +26,7 @@ const MOCK_USERS: User[] = [
   { id: '1', name: 'Super Admin', email: 'admin@system.com', role: 'superadmin' },
   { id: '2', name: 'John Doe', email: 'john@tech.com', role: 'person', departmentId: '1', departmentName: 'Technical' },
   { id: '3', name: 'Officer Smith', email: 'smith@police.com', role: 'police' },
-  { id: '4', name: 'Agent Johnson', email: 'johnson@dice.com', role: 'dice' },
+  { id: '4', name: 'Agent Johnson', email: 'johnson@dise.com', role: 'dise' },
   { id: '5', name: 'Manager Wilson', email: 'wilson@admin.com', role: 'admin' },
 ];
 

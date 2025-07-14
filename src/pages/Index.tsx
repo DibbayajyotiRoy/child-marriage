@@ -19,7 +19,7 @@ const Index = () => {
     case 'person':
       return <PersonDashboard />;
     case 'police':
-    case 'dice':
+    case 'dise':
     case 'admin':
       return <OthersDashboard />;
     default:
