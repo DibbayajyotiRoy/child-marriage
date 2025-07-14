@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { InteractiveCard } from '@/components/ui/interactive-card';
 import { AnimatedStats } from '@/components/ui/animated-stats';
@@ -23,6 +23,7 @@ import {
 
 export function OthersDashboard() {
   const { issues, reports } = useMockData();
+  const [activeTab, setActiveTab] = useState('dashboard');
   
   // Handle case where issues might be undefined initially
   const safeIssues = issues || [];
@@ -59,7 +60,12 @@ export function OthersDashboard() {
         {sidebarItems.map((item) => (
           <button
             key={item.id}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+              activeTab === item.id
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
           >
             <item.icon className="h-5 w-5" />
             {item.label}
@@ -69,7 +75,7 @@ export function OthersDashboard() {
     </nav>
   );
 
-  const dashboardContent = (
+  const renderDashboard = () => (
     <div className="space-y-8 animate-fade-in">
       {/* Hero Section */}
       <div className="text-center space-y-4 py-8">
@@ -236,12 +242,132 @@ export function OthersDashboard() {
     </div>
   );
 
+  const renderActiveCases = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Active Cases</h2>
+        <Button className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Case
+        </Button>
+      </div>
+      <div className="grid gap-4">
+        {safeIssues.filter(issue => issue.status === 'active').map((case_) => (
+          <InteractiveCard key={case_.id} className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">{case_.title}</h3>
+                <p className="text-muted-foreground">{case_.location}</p>
+                <Badge variant="destructive" className="mt-2">{case_.status}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <Users className="h-4 w-4" />
+                  Assign Team
+                </Button>
+              </div>
+            </div>
+          </InteractiveCard>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderTeams = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Response Teams</h2>
+        <Button className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Create Team
+        </Button>
+      </div>
+      <div className="grid gap-4">
+        <InteractiveCard className="p-6">
+          <h3 className="text-lg font-semibold">Emergency Response Team Alpha</h3>
+          <p className="text-muted-foreground">Active team handling urgent cases</p>
+          <Badge variant="default" className="mt-2">Active</Badge>
+        </InteractiveCard>
+        <InteractiveCard className="p-6">
+          <h3 className="text-lg font-semibold">Investigation Unit Beta</h3>
+          <p className="text-muted-foreground">Specialized investigation team</p>
+          <Badge variant="secondary" className="mt-2">Available</Badge>
+        </InteractiveCard>
+      </div>
+    </div>
+  );
+
+  const renderReports = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Reports</h2>
+        <Button className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Generate Report
+        </Button>
+      </div>
+      <div className="grid gap-4">
+        {safeReports.map((report) => (
+          <InteractiveCard key={report.id} className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Report #{report.id}</h3>
+                <p className="text-muted-foreground">Generated report</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Created: {report.createdAt.toLocaleDateString()}
+                </p>
+              </div>
+              <Button variant="outline" size="sm">
+                View Report
+              </Button>
+            </div>
+          </InteractiveCard>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Settings</h2>
+      <div className="grid gap-4">
+        <InteractiveCard className="p-6">
+          <h3 className="text-lg font-semibold">Notification Preferences</h3>
+          <p className="text-muted-foreground">Configure how you receive alerts and updates</p>
+          <Button variant="outline" className="mt-4">Configure</Button>
+        </InteractiveCard>
+        <InteractiveCard className="p-6">
+          <h3 className="text-lg font-semibold">Security Settings</h3>
+          <p className="text-muted-foreground">Manage your account security and permissions</p>
+          <Button variant="outline" className="mt-4">Manage</Button>
+        </InteractiveCard>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return renderDashboard();
+      case 'cases':
+        return renderActiveCases();
+      case 'teams':
+        return renderTeams();
+      case 'reports':
+        return renderReports();
+      case 'settings':
+        return renderSettings();
+      default:
+        return renderDashboard();
+    }
+  };
+
   return (
     <DashboardLayout
       title="Operations Dashboard"
       sidebar={Sidebar}
     >
-      {dashboardContent}
+      {renderContent()}
     </DashboardLayout>
   );
 }

@@ -113,7 +113,14 @@ export function SuperadminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Departments</h2>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => {
+            // Add department functionality
+            console.log('Add department clicked');
+            alert('Add Department functionality will be implemented');
+          }}
+        >
           <Plus className="h-4 w-4" />
           Add Department
         </Button>
