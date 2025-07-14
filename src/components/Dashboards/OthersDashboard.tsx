@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { InteractiveCard } from '@/components/ui/interactive-card';
 import { AnimatedStats } from '@/components/ui/animated-stats';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,8 @@ import {
   Shield,
   Heart,
   Bot,
-  Plus
+  Plus,
+  Settings
 } from 'lucide-react';
 
 export function OthersDashboard() {
@@ -43,7 +45,31 @@ export function OthersDashboard() {
     }
   };
 
-  return (
+  const sidebarItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+    { id: 'cases', label: 'Active Cases', icon: AlertTriangle },
+    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'teams', label: 'Teams', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const Sidebar = (
+    <nav className="p-4">
+      <div className="space-y-2">
+        {sidebarItems.map((item) => (
+          <button
+            key={item.id}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <item.icon className="h-5 w-5" />
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+
+  const dashboardContent = (
     <div className="space-y-8 animate-fade-in">
       {/* Hero Section */}
       <div className="text-center space-y-4 py-8">
@@ -208,5 +234,14 @@ export function OthersDashboard() {
         </div>
       </InteractiveCard>
     </div>
+  );
+
+  return (
+    <DashboardLayout
+      title="Operations Dashboard"
+      sidebar={Sidebar}
+    >
+      {dashboardContent}
+    </DashboardLayout>
   );
 }
