@@ -20,7 +20,8 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
   
   // Count active and pending issues for notification badge
-  const activeIssuesCount = issues.filter(issue => 
+  const safeIssues = issues || [];
+  const activeIssuesCount = safeIssues.filter(issue => 
     issue.status === 'active' || issue.status === 'pending'
   ).length;
 
@@ -106,7 +107,7 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
       <NotificationModal
         open={notificationModalOpen}
         onOpenChange={setNotificationModalOpen}
-        issues={issues}
+        issues={safeIssues}
       />
     </div>
   );
