@@ -1,45 +1,42 @@
-
 import { BaseApiService } from '../base';
 import { endpoints } from '../endpoints';
 import { Report } from '@/types';
 
+// Matches the 'reports' table in db.json
 export interface CreateReportRequest {
-  issueId: string;
-  authorId: string;
+  caseId: number;
+  submittedBy: number;
+  teamFormationId: number;
   content: string;
 }
 
 export interface UpdateReportRequest {
-  content: string;
+  content?: string;
 }
 
 export class ReportService extends BaseApiService {
-  async getById(id: string): Promise<Report> {
+  async getById(id: number): Promise<Report> {
     return this.get<Report>(endpoints.reports.getById(id));
   }
 
-  async getByTeamMember(personId: string): Promise<Report[]> {
-    return this.get<Report[]>(endpoints.reports.getByTeamMember(personId));
-  }
-
-  async getByCaseId(caseId: string): Promise<Report[]> {
+  async getByCaseId(caseId: number): Promise<Report[]> {
     return this.get<Report[]>(endpoints.reports.getByCaseId(caseId));
   }
 
   async create(request: CreateReportRequest): Promise<Report> {
-    return this.post<Report>(endpoints.reports.create(), request);
+    const newReport = {
+      ...request,
+      submittedAt: new Date().toISOString(),
+    };
+    return this.post<Report>(endpoints.reports.create(), newReport);
   }
 
-  async update(id: string, request: UpdateReportRequest): Promise<Report> {
+  async update(id: number, request: UpdateReportRequest): Promise<Report> {
     return this.put<Report>(endpoints.reports.update(id), request);
   }
 
-  async deleteReport(id: string): Promise<void> {
+  async deleteReport(id: number): Promise<void> {
     return this.delete<void>(endpoints.reports.delete(id));
-  }
-
-  async getFinalReport(caseId: string): Promise<Report> {
-    return this.get<Report>(endpoints.reports.getFinalReport(caseId));
   }
 }
 

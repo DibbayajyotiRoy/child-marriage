@@ -1,0 +1,91 @@
+{
+  "cases": [
+    {
+      "id": "1",
+      "title": "Illegal Dumping Report",
+      "description": "Waste dumped near river",
+      "status": "active",
+      "createdBy": 3,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-14T10:30:00Z"
+    }
+  ],
+  "teamFormations": [
+    {
+      "id": "1",
+      "caseId": 1,
+      "createdBy": 1,
+      "members": [
+        {
+          "personId": 2,
+          "status": "pending"
+        },
+        {
+          "personId": 3,
+          "status": "accepted"
+        }
+      ],
+      "createdAt": "2025-07-14T10:35:00Z"
+    }
+  ],
+  "reports": [
+    {
+      "id": "1",
+      "caseId": 1,
+      "submittedBy": 3,
+      "teamFormationId": 1,
+      "content": "Site inspected. Need further action.",
+      "submittedAt": "2025-07-14T12:00:00Z"
+    }
+  ],
+  "persons": [
+    {
+      "id": "1",
+      "name": "Super Admin",
+      "email": "admin@system.com",
+      "password": "admin123",
+      "role": "superadmin"
+    },
+    {
+      "id": "2",
+      "name": "John Doe",
+      "email": "john@dept.com",
+      "password": "password",
+      "departmentId": 1,
+      "role": "person"
+    },
+    {
+      "id": "3",
+      "name": "Jane Smith",
+      "email": "jane@police.com",
+      "password": "secure",
+      "departmentId": 2,
+      "role": "police"
+    }
+  ],
+  "departments": [
+    {
+      "id": "1",
+      "name": "Technical",
+      "district": "North District"
+    },
+    {
+      "id": "2",
+      "name": "Support",
+      "district": "South District"
+    },
+    {
+      "id": "7f3d",
+      "name": "Education",
+      "district": "West Tripura"
+    }
+  ],
+  "admins": [
+    {
+      "id": "1",
+      "email": "admin@system.com",
+      "password": "admin123"
+    }
+  ]
+}

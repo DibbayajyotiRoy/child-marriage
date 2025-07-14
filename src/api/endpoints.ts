@@ -1,57 +1,62 @@
-
-// API Endpoints Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL =  'http://localhost:3001'; // Assuming json-server runs on port 3000
 
 export const endpoints = {
-  // Team Formation Controller
+  // Team Formations
   teamFormation: {
-    getById: (id: string) => `${API_BASE_URL}/team-formations/${id}`,
-    getByCaseId: (caseId: string) => `${API_BASE_URL}/team-formations/case/${caseId}`,
-    create: () => `${API_BASE_URL}/team-formations`,
-    updateResponse: (id: string) => `${API_BASE_URL}/team-formations/${id}/response`,
-    getPendingResponses: () => `${API_BASE_URL}/team-formations/pending-responses`,
+    getAll: () => `${API_BASE_URL}/teamFormations`,
+    getById: (id: number) => `${API_BASE_URL}/teamFormations/${id}`,
+    // Get team formation for a specific case
+    getByCaseId: (caseId: number) => `${API_BASE_URL}/teamFormations?caseId=${caseId}`,
+    create: () => `${API_BASE_URL}/teamFormations`,
+    update: (id: number) => `${API_BASE_URL}/teamFormations/${id}`,
   },
 
-  // Report Controller
+  // Reports
   reports: {
-    getById: (id: string) => `${API_BASE_URL}/reports/${id}`,
-    getByTeamMember: (personId: string) => `${API_BASE_URL}/reports/team-member/${personId}`,
-    getByCaseId: (caseId: string) => `${API_BASE_URL}/reports/case/${caseId}`,
+    getAll: () => `${API_BASE_URL}/reports`,
+    getById: (id: number) => `${API_BASE_URL}/reports/${id}`,
+    // Use query params for filtering
+    getByCaseId: (caseId: number) => `${API_BASE_URL}/reports?caseId=${caseId}`,
+    getBySubmitter: (personId: number) => `${API_BASE_URL}/reports?submittedBy=${personId}`,
     create: () => `${API_BASE_URL}/reports`,
-    update: (id: string) => `${API_BASE_URL}/reports/${id}`,
-    delete: (id: string) => `${API_BASE_URL}/reports/${id}`,
-    getFinalReport: (caseId: string) => `${API_BASE_URL}/cases/${caseId}/final-report`,
+    update: (id: number) => `${API_BASE_URL}/reports/${id}`,
+    delete: (id: number) => `${API_BASE_URL}/reports/${id}`,
   },
 
-  // Person Controller
+  // Persons
   persons: {
-    getById: (id: string) => `${API_BASE_URL}/persons/${id}`,
     getAll: () => `${API_BASE_URL}/persons`,
+    getById: (id: number) => `${API_BASE_URL}/persons/${id}`,
+    // For login, we'll query by email
+    getByEmail: (email: string) => `${API_BASE_URL}/persons?email=${email}`,
     create: () => `${API_BASE_URL}/persons`,
-    update: (id: string) => `${API_BASE_URL}/persons/${id}`,
-    delete: (id: string) => `${API_BASE_URL}/persons/${id}`,
-    login: () => `${API_BASE_URL}/persons/login`,
+    update: (id: number) => `${API_BASE_URL}/persons/${id}`,
+    delete: (id: number) => `${API_BASE_URL}/persons/${id}`,
   },
 
-  // Case Controller (Child Marriage Cases)
+  // Cases
   cases: {
-    getById: (id: string) => `${API_BASE_URL}/cases/${id}`,
     getAll: () => `${API_BASE_URL}/cases`,
+    getById: (id: number) => `${API_BASE_URL}/cases/${id}`,
     create: () => `${API_BASE_URL}/cases`,
-    update: (id: string) => `${API_BASE_URL}/cases/${id}`,
-    delete: (id: string) => `${API_BASE_URL}/cases/${id}`,
-    assignTeam: (caseId: string) => `${API_BASE_URL}/cases/${caseId}/team`,
-    getStatus: (id: string) => `${API_BASE_URL}/cases/${id}/status`,
-    escalate: (caseId: string) => `${API_BASE_URL}/cases/${caseId}/escalate`,
+    update: (id: number) => `${API_BASE_URL}/cases/${id}`,
+    delete: (id: number) => `${API_BASE_URL}/cases/${id}`,
   },
 
-  // Admin Controller
+  // Admins
   admin: {
-    login: () => `${API_BASE_URL}/admin/login`,
+    // We can query the admins table by email for login
+    getByEmail: (email: string) => `${API_BASE_URL}/admins?email=${email}`,
   },
 
-  // Department Controller
+  // Departments
   departments: {
-    getByDistrict: (districtName: string) => `${API_BASE_URL}/departments/district/${districtName}`,
+    getAll: () => `${API_BASE_URL}/departments`,
+    getById: (id: number) => `${API_BASE_URL}/departments/${id}`,
+    // Use query params for filtering by district
+    getByDistrict: (districtName: string) => `${API_BASE_URL}/departments?district=${districtName}`,
+    create: () => `${API_BASE_URL}/departments`,
+    update: (id: number) => `${API_BASE_URL}/departments/${id}`,
+    delete: (id: number) => `${API_BASE_URL}/departments/${id}`,
   },
 };

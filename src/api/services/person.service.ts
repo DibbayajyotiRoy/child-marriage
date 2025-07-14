@@ -1,4 +1,3 @@
-
 import { BaseApiService } from '../base';
 import { endpoints } from '../endpoints';
 import { Person } from '@/types';
@@ -6,14 +5,16 @@ import { Person } from '@/types';
 export interface CreatePersonRequest {
   name: string;
   email: string;
-  role: 'person';
-  departmentId: string;
+  password: string; // Password should be sent on creation
+  departmentId: number;
+  role: 'person' | 'police';
 }
 
 export interface UpdatePersonRequest {
   name?: string;
   email?: string;
-  departmentId?: string;
+  departmentId?: number;
+  role?: 'person' | 'police';
 }
 
 export interface LoginRequest {
@@ -21,34 +22,41 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse {
-  user: Person;
-  token: string;
-}
-
+// Login logic for a simple json-server
 export class PersonService extends BaseApiService {
-  async getById(id: string): Promise<Person> {
-    return this.get<Person>(endpoints.persons.getById(id));
-  }
+  async login(request: LoginRequest): Promise<Person | null> {
+    // 1. Fetch user by email
+    const users = await this.get<Person[]>(endpoints.persons.getByEmail(request.email));
+    const user = users[0]; // Email should be unique
 
+    // 2. Check if user exists and password matches
+    if (user && user.password === request.password) {
+      delete user.password; // Don't keep password in the client-side object
+      return user;
+    }
+    
+    return null; // Login failed
+  }
+  
+  // Standard CRUD operations
   async getAll(): Promise<Person[]> {
     return this.get<Person[]>(endpoints.persons.getAll());
+  }
+
+  async getById(id: number): Promise<Person> {
+    return this.get<Person>(endpoints.persons.getById(id));
   }
 
   async create(request: CreatePersonRequest): Promise<Person> {
     return this.post<Person>(endpoints.persons.create(), request);
   }
 
-  async update(id: string, request: UpdatePersonRequest): Promise<Person> {
+  async update(id: number, request: UpdatePersonRequest): Promise<Person> {
     return this.put<Person>(endpoints.persons.update(id), request);
   }
 
-  async deletePerson(id: string): Promise<void> {
+  async deletePerson(id: number): Promise<void> {
     return this.delete<void>(endpoints.persons.delete(id));
-  }
-
-  async login(request: LoginRequest): Promise<LoginResponse> {
-    return this.post<LoginResponse>(endpoints.persons.login(), request);
   }
 }
 

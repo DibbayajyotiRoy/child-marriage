@@ -1,89 +1,59 @@
-
 import { BaseApiService } from '../base';
 import { endpoints } from '../endpoints';
-import { Issue } from '@/types';
+import { Case } from '@/types'; // Assuming you have a types file
 
+// This interface should match the fields in your 'cases' table in db.json
 export interface CreateCaseRequest {
   title: string;
   description: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  reportedBy: string;
-  reportedByEmail: string;
-  location: string;
-  victimAge?: number;
-  urgencyLevel: 'immediate' | 'urgent' | 'normal';
-  suspectedGroomAge?: number;
-  familyInvolved: boolean;
-  witnessesAvailable: boolean;
-  evidenceDescription?: string;
-  marriageScheduledDate?: Date;
-  interventionRequired: boolean;
-  lawEnforcementNotified: boolean;
-  socialWorkerAssigned?: string;
-  courtOrderRequired: boolean;
-  rescueOperationNeeded: boolean;
+  createdBy: number;
+  departmentId: number;
+  // Set defaults for these on creation
+  status?: 'active' | 'pending' | 'resolved';
+  finalReportSubmitted?: boolean;
+  createdAt?: string;
 }
 
 export interface UpdateCaseRequest {
   title?: string;
   description?: string;
   status?: 'active' | 'pending' | 'resolved';
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  assignedTo?: string;
-  assignedTeam?: string;
-}
-
-export interface AssignTeamRequest {
-  teamId: string;
-  notes?: string;
+  departmentId?: number;
+  finalReportSubmitted?: boolean;
 }
 
 export class CaseService extends BaseApiService {
-  async getById(id: string): Promise<Issue> {
-    return this.get<Issue>(endpoints.cases.getById(id));
+  async getById(id: number): Promise<Case> {
+    return this.get<Case>(endpoints.cases.getById(id));
   }
 
-  async getAll(): Promise<Issue[]> {
-    return this.get<Issue[]>(endpoints.cases.getAll());
+  async getAll(): Promise<Case[]> {
+    return this.get<Case[]>(endpoints.cases.getAll());
   }
 
-  async create(request: CreateCaseRequest): Promise<Issue> {
-    return this.post<Issue>(endpoints.cases.create(), request);
+  async create(request: CreateCaseRequest): Promise<Case> {
+    const newCase = {
+      ...request,
+      // Set server-side-like defaults
+      status: 'active',
+      finalReportSubmitted: false,
+      createdAt: new Date().toISOString(),
+    };
+    return this.post<Case>(endpoints.cases.create(), newCase);
   }
 
-  async update(id: string, request: UpdateCaseRequest): Promise<Issue> {
-    return this.put<Issue>(endpoints.cases.update(id), request);
+  async update(id: number, request: UpdateCaseRequest): Promise<Case> {
+    return this.put<Case>(endpoints.cases.update(id), request);
   }
 
-  async deleteCase(id: string): Promise<void> {
+  async deleteCase(id: number): Promise<void> {
     return this.delete<void>(endpoints.cases.delete(id));
   }
 
-  async assignTeam(caseId: string, request: AssignTeamRequest): Promise<Issue> {
-    return this.post<Issue>(endpoints.cases.assignTeam(caseId), request);
-  }
-
-  async getStatus(id: string): Promise<{ status: string; lastUpdated: Date }> {
-    return this.get<{ status: string; lastUpdated: Date }>(endpoints.cases.getStatus(id));
-  }
-
-  async escalate(caseId: string): Promise<Issue> {
-    return this.post<Issue>(endpoints.cases.escalate(caseId), {});
-  }
-
-  async getActiveCases(): Promise<Issue[]> {
+  // Client-side filtering is fine, or you can use json-server's query params
+  async getCasesByStatus(status: 'active' | 'pending' | 'resolved'): Promise<Case[]> {
     const allCases = await this.getAll();
-    return allCases.filter(c => c.status === 'active');
-  }
-
-  async getPendingCases(): Promise<Issue[]> {
-    const allCases = await this.getAll();
-    return allCases.filter(c => c.status === 'pending');
-  }
-
-  async getResolvedCases(): Promise<Issue[]> {
-    const allCases = await this.getAll();
-    return allCases.filter(c => c.status === 'resolved');
+    return allCases.filter(c => c.status === status);
   }
 }
 
