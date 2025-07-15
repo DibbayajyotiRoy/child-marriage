@@ -2,13 +2,143 @@
   "cases": [
     {
       "id": "1",
-      "title": "Illegal Dumping Report",
-      "description": "Waste dumped near river",
+      "title": "Child Marriage in Bishalgarh",
+      "description": "Reported child marriage in Bishalgarh village.",
       "status": "active",
+      "createdBy": 2,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-14T08:00:00Z"
+    },
+    {
+      "id": "2",
+      "title": "Child Marriage Attempt in Belonia",
+      "description": "Attempt to marry a 15-year-old girl in Belonia.",
+      "status": "pending",
       "createdBy": 3,
       "departmentId": 2,
       "finalReportSubmitted": false,
-      "createdAt": "2025-07-14T10:30:00Z"
+      "createdAt": "2025-07-13T11:20:00Z"
+    },
+    {
+      "id": "3",
+      "title": "Forced Marriage Case in Kanchanpur",
+      "description": "15-year-old girl forced to marry by relatives.",
+      "status": "resolved",
+      "createdBy": 2,
+      "departmentId": 1,
+      "finalReportSubmitted": true,
+      "createdAt": "2025-07-12T09:15:00Z"
+    },
+    {
+      "id": "4",
+      "title": "Minor Bride Found in Udaipur",
+      "description": "Child marriage event disrupted by police.",
+      "status": "active",
+      "createdBy": 3,
+      "departmentId": 1,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-11T14:10:00Z"
+    },
+    {
+      "id": "5",
+      "title": "Agartala Slum Child Marriage",
+      "description": "Slum area reported early marriage incident.",
+      "status": "pending",
+      "createdBy": 2,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-11T17:45:00Z"
+    },
+    {
+      "id": "6",
+      "title": "Case from Kumarghat",
+      "description": "Tip-off received about underage bride preparations.",
+      "status": "resolved",
+      "createdBy": 3,
+      "departmentId": 1,
+      "finalReportSubmitted": true,
+      "createdAt": "2025-07-10T10:00:00Z"
+    },
+    {
+      "id": "7",
+      "title": "Dharmanagar Child Marriage Attempt",
+      "description": "Reported marriage of a 14-year-old in local media.",
+      "status": "active",
+      "createdBy": 2,
+      "departmentId": 1,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-09T13:30:00Z"
+    },
+    {
+      "id": "8",
+      "title": "Sonamura Minor Girl Marriage Disrupted",
+      "description": "NGO intervention stopped marriage of schoolgirl.",
+      "status": "pending",
+      "createdBy": 3,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-09T18:25:00Z"
+    },
+    {
+      "id": "9",
+      "title": "Jampuijala Rural Child Marriage",
+      "description": "Village elders arranged child marriage in tribal belt.",
+      "status": "active",
+      "createdBy": 2,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-08T15:00:00Z"
+    },
+    {
+      "id": "10",
+      "title": "Unakoti District Minor Bride Case",
+      "description": "Child marriage stopped during temple festival.",
+      "status": "resolved",
+      "createdBy": 3,
+      "departmentId": 1,
+      "finalReportSubmitted": true,
+      "createdAt": "2025-07-08T08:40:00Z"
+    },
+    {
+      "id": "11",
+      "title": "Khowai Girl Marriage Alert",
+      "description": "Anonymous call informed about a marriage of 16-year-old.",
+      "status": "active",
+      "createdBy": 2,
+      "departmentId": 2,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-07T11:30:00Z"
+    },
+    {
+      "id": "12",
+      "title": "Teliamura Marriage Investigation",
+      "description": "Police received social media tip-off.",
+      "status": "pending",
+      "createdBy": 3,
+      "departmentId": 1,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-07T13:10:00Z"
+    },
+    {
+      "id": "13",
+      "title": "Mohanpur Minor Marriage Rumor",
+      "description": "Local NGO alerted authorities.",
+      "status": "resolved",
+      "createdBy": 2,
+      "departmentId": 2,
+      "finalReportSubmitted": true,
+      "createdAt": "2025-07-06T17:20:00Z"
+    },
+    {
+      "id": "14",
+      "title": "Gomati Region Child Marriage Crackdown",
+      "description": "Three girls rescued from underage marriages.",
+      "status": "active",
+      "createdBy": 3,
+      "departmentId": 1,
+      "finalReportSubmitted": false,
+      "createdAt": "2025-07-06T10:50:00Z"
     }
   ],
   "teamFormations": [
@@ -17,16 +147,120 @@
       "caseId": 1,
       "createdBy": 1,
       "members": [
-        {
-          "personId": 2,
-          "status": "pending"
-        },
-        {
-          "personId": 3,
-          "status": "accepted"
-        }
+        { "personId": 2, "status": "pending" },
+        { "personId": 3, "status": "accepted" }
       ],
-      "createdAt": "2025-07-14T10:35:00Z"
+      "createdAt": "2025-07-14T08:10:00Z"
+    },
+    {
+      "id": "2",
+      "caseId": 2,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "accepted" },
+        { "personId": 3, "status": "pending" }
+      ],
+      "createdAt": "2025-07-13T11:30:00Z"
+    },
+    {
+      "id": "3",
+      "caseId": 3,
+      "createdBy": 1,
+      "members": [
+        { "personId": 3, "status": "accepted" },
+        { "personId": 2, "status": "pending" }
+      ],
+      "createdAt": "2025-07-12T09:25:00Z"
+    },
+    {
+      "id": "4",
+      "caseId": 4,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "accepted" },
+        { "personId": 3, "status": "pending" }
+      ],
+      "createdAt": "2025-07-11T14:20:00Z"
+    },
+    {
+      "id": "5",
+      "caseId": 5,
+      "createdBy": 1,
+      "members": [
+        { "personId": 3, "status": "pending" },
+        { "personId": 2, "status": "accepted" }
+      ],
+      "createdAt": "2025-07-11T17:50:00Z"
+    },
+    {
+      "id": "6",
+      "caseId": 6,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "accepted" },
+        { "personId": 3, "status": "pending" }
+      ],
+      "createdAt": "2025-07-10T10:10:00Z"
+    },
+    {
+      "id": "7",
+      "caseId": 7,
+      "createdBy": 1,
+      "members": [
+        { "personId": 3, "status": "accepted" },
+        { "personId": 2, "status": "pending" }
+      ],
+      "createdAt": "2025-07-09T13:35:00Z"
+    },
+    {
+      "id": "8",
+      "caseId": 8,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "pending" },
+        { "personId": 3, "status": "accepted" }
+      ],
+      "createdAt": "2025-07-09T18:30:00Z"
+    },
+    {
+      "id": "9",
+      "caseId": 9,
+      "createdBy": 1,
+      "members": [
+        { "personId": 3, "status": "pending" },
+        { "personId": 2, "status": "accepted" }
+      ],
+      "createdAt": "2025-07-08T15:10:00Z"
+    },
+    {
+      "id": "10",
+      "caseId": 10,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "accepted" },
+        { "personId": 3, "status": "pending" }
+      ],
+      "createdAt": "2025-07-08T08:45:00Z"
+    },
+    {
+      "id": "11",
+      "caseId": 11,
+      "createdBy": 1,
+      "members": [
+        { "personId": 3, "status": "pending" },
+        { "personId": 2, "status": "accepted" }
+      ],
+      "createdAt": "2025-07-07T11:35:00Z"
+    },
+    {
+      "id": "12",
+      "caseId": 12,
+      "createdBy": 1,
+      "members": [
+        { "personId": 2, "status": "accepted" },
+        { "personId": 3, "status": "pending" }
+      ],
+      "createdAt": "2025-07-07T13:20:00Z"
     }
   ],
   "reports": [
@@ -67,25 +301,18 @@
   "departments": [
     {
       "id": "1",
-      "name": "Technical",
-      "district": "North District"
+      "name": "Police",
+      "district": "West Tripura"
     },
     {
       "id": "2",
-      "name": "Support",
-      "district": "South District"
+      "name": "DISE",
+      "district": "North Tripura"
     },
     {
-      "id": "7f3d",
-      "name": "Education",
-      "district": "West Tripura"
-    }
-  ],
-  "admins": [
-    {
-      "id": "1",
-      "email": "admin@system.com",
-      "password": "admin123"
+      "id": "3",
+      "name": "Administrative",
+      "district": "South Tripura"
     }
   ]
 }

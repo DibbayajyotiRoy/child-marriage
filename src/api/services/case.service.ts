@@ -22,6 +22,13 @@ export interface UpdateCaseRequest {
   finalReportSubmitted?: boolean;
 }
 
+// Interface for team assignment request
+export interface AssignTeamRequest {
+  teamMembers: number[]; // Array of person IDs
+  leaderId?: number; // Optional team leader ID
+  assignedAt?: string;
+}
+
 export class CaseService extends BaseApiService {
   async getById(id: number): Promise<Case> {
     return this.get<Case>(endpoints.cases.getById(id));
@@ -35,9 +42,9 @@ export class CaseService extends BaseApiService {
     const newCase = {
       ...request,
       // Set server-side-like defaults
-      status: 'active',
-      finalReportSubmitted: false,
-      createdAt: new Date().toISOString(),
+      status: request.status || 'active',
+      finalReportSubmitted: request.finalReportSubmitted || false,
+      createdAt: request.createdAt || new Date().toISOString(),
     };
     return this.post<Case>(endpoints.cases.create(), newCase);
   }
@@ -50,10 +57,52 @@ export class CaseService extends BaseApiService {
     return this.delete<void>(endpoints.cases.delete(id));
   }
 
-  // Client-side filtering is fine, or you can use json-server's query params
+  // New method for team assignment based on the screenshot
+  async assignTeam(caseId: number, request: AssignTeamRequest): Promise<any> {
+    const teamData = {
+      ...request,
+      assignedAt: request.assignedAt || new Date().toISOString(),
+    };
+    return this.post<any>(endpoints.cases.assignTeam(caseId), teamData);
+  }
+
+  // Client-side filtering methods - these can be used if backend doesn't support query params
   async getCasesByStatus(status: 'active' | 'pending' | 'resolved'): Promise<Case[]> {
     const allCases = await this.getAll();
     return allCases.filter(c => c.status === status);
+  }
+
+  async getCasesByDepartment(departmentId: number): Promise<Case[]> {
+    const allCases = await this.getAll();
+    return allCases.filter(c => c.departmentId === departmentId);
+  }
+
+  async getCasesByCreator(createdBy: number): Promise<Case[]> {
+    const allCases = await this.getAll();
+    return allCases.filter(c => c.createdBy === createdBy);
+  }
+
+  // Server-side filtering methods (if your backend supports query parameters)
+  async getCasesByStatusServer(status: 'active' | 'pending' | 'resolved'): Promise<Case[]> {
+    return this.get<Case[]>(`${endpoints.cases.getAll()}?status=${status}`);
+  }
+
+  async getCasesByDepartmentServer(departmentId: number): Promise<Case[]> {
+    return this.get<Case[]>(`${endpoints.cases.getAll()}?departmentId=${departmentId}`);
+  }
+
+  async getCasesByCreatorServer(createdBy: number): Promise<Case[]> {
+    return this.get<Case[]>(`${endpoints.cases.getAll()}?createdBy=${createdBy}`);
+  }
+
+  // Pagination support
+  async getCasesPaginated(page: number = 1, limit: number = 10): Promise<Case[]> {
+    return this.get<Case[]>(`${endpoints.cases.getAll()}?_page=${page}&_limit=${limit}`);
+  }
+
+  // Search functionality
+  async searchCases(query: string): Promise<Case[]> {
+    return this.get<Case[]>(`${endpoints.cases.getAll()}?q=${encodeURIComponent(query)}`);
   }
 }
 
