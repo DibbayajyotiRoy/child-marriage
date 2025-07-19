@@ -1,32 +1,48 @@
+"use client";
 
-import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import React, { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mail, Lock, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom"; // Using react-router-dom for navigation
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("admin@system.com");
+  const [password, setPassword] = useState("password");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Invalid email or password');
+      // ✅ CRITICAL FIX: Pass a single object { email, password }
+      const success = await login({ email, password });
+
+      if (success) {
+        // Redirect logic based on user role can be added here
+        // For now, we redirect all successful logins to the superadmin dashboard
+        navigate("/superadmin-dashboard");
       }
     } catch (err) {
-      setError('An error occurred during login');
+      console.error(err);
+      setError(
+        "An error occurred during login. Please check your credentials."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -36,7 +52,9 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Issue Management System</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Issue Management System
+          </CardTitle>
           <CardDescription>Sign in to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent>
@@ -56,7 +74,7 @@ export function LoginForm() {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -81,19 +99,33 @@ export function LoginForm() {
             )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-gray-700 mb-2">Demo Accounts:</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Demo Accounts:
+            </p>
             <div className="space-y-1 text-xs text-gray-600">
-              <p><strong>Super Admin:</strong> admin@system.com</p>
-              <p><strong>Department Member:</strong> john@tech.com</p>
-              <p><strong>Police:</strong> smith@police.com</p>
-              <p><strong>DICE:</strong> johnson@dice.com</p>
-              <p><strong>Admin:</strong> wilson@admin.com</p>
-              <p className="mt-2 font-medium">Password: <code>password</code></p>
+              <p>
+                <strong>Super Admin:</strong> admin@system.com
+              </p>
+              <p>
+                <strong>Department Member:</strong> john@tech.com
+              </p>
+              <p>
+                <strong>Police:</strong> smith@police.com
+              </p>
+              <p>
+                <strong>DICE:</strong> johnson@dice.com
+              </p>
+              <p>
+                <strong>Admin:</strong> wilson@admin.com
+              </p>
+              <p className="mt-2 font-medium">
+                Password: <code>password</code>
+              </p>
             </div>
           </div>
         </CardContent>

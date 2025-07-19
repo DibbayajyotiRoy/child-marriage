@@ -1,54 +1,57 @@
 // src/types.ts
 
 export interface Case {
-  id: number;
+  id: string; 
   title: string;
   description: string;
   status: 'active' | 'pending' | 'resolved';
-  createdBy: number;
-  departmentId: number;
+  createdBy: string; 
+  departmentId: string; 
   finalReportSubmitted: boolean;
-  createdAt: string;
+  createdAt?: string; 
+  updatedAt?: string;
 }
 
 export interface TeamFormation {
-  id: number;
-  caseId: number;
-  createdBy: number;
-  members: {
-    personId: number;
-    status: 'pending' | 'accepted' | 'rejected';
-  }[];
-  createdAt: string;
+  team_id: string; 
+  case_id: string; 
+  supervisor_id: string;
+  member_ids: string[];
+  admin_status?: string;
+  police_status?: string;
+  dice_status?: string;
+  response_status?: string;
+  formed_at?: string;
 }
 
 export interface Report {
-  id: number;
-  caseId: number;
-  submittedBy: number;
-  teamFormationId: number;
+  id: number; 
+  caseId: string; 
+  personId: string;
   content: string;
   submittedAt: string;
 }
 
 export interface Person {
-  id: number;
-  name: string;
+  id: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  // Note: Password should generally not be sent to the client.
-  password?: string;
-  departmentId: number;
-  role: 'superadmin' | 'person' | 'police';
+  department?: string;
+  departmentId?: string;
+  // ✅ FIXED: Role now includes 'SUPERADMIN' to match all possible user types.
+  role?: 'MEMBER' | 'SUPERVISOR' | 'SUPERADMIN';
 }
 
 export interface Department {
-  id: number;
+  id: string;
   name: string;
   district: string;
 }
 
-export interface Admin {
-  id: number;
-  email: string;
-  password?: string;
+export interface Post {
+  id: string;
+  postName: string;
+  department: 'POLICE' | 'DICE' | 'ADMINISTRATION';
+  rank: number;
 }

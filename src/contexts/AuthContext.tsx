@@ -1,115 +1,110 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { personService, adminService } from '@/api';
+"use client";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { authService, LoginRequest } from "@/api/services/auth.service";
+import { personService } from "@/api/services/person.service";
+import type { Person } from "@/types"; // Import your main Person type
 
-export type UserRole = 'superadmin' | 'person' | 'police' | 'dise' | 'admin';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  departmentId?: string;
-  departmentName?: string;
+// ✅ FIXED: The User type now correctly extends the updated Person type without conflict.
+export interface User extends Person {
+  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
   isAuthenticated: boolean;
+  login: (credentials: LoginRequest) => Promise<boolean>;
+  logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo purposes - will be replaced with API calls
-const MOCK_USERS: User[] = [
-  { id: '1', name: 'Super Admin', email: 'admin@system.com', role: 'superadmin' },
-  { id: '2', name: 'John Doe', email: 'john@tech.com', role: 'person', departmentId: '1', departmentName: 'Technical' },
-  { id: '3', name: 'Officer Smith', email: 'smith@police.com', role: 'police' },
-  { id: '4', name: 'Agent Johnson', email: 'johnson@dise.com', role: 'dise' },
-  { id: '5', name: 'Manager Wilson', email: 'wilson@admin.com', role: 'admin' },
-];
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('authToken');
-    if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
-    }
+    const initializeAuth = () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      } catch (error) {
+        console.error("Failed to parse stored user from localStorage:", error);
+        localStorage.removeItem("user");
+      } finally {
+        setLoading(false);
+      }
+    };
+    initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      // Try admin login first
-      if (email.includes('admin')) {
-        const response = await adminService.login({ email, password });
-        const userData: User = {
-          id: response.admin.id,
-          name: response.admin.name,
-          email: response.admin.email,
-          role: response.admin.role,
-        };
-        
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('authToken', response.token);
-        return true;
-      }
-
-      // Try person login
-      const response = await personService.login({ email, password });
-      const userData: User = {
-        id: response.user.id,
-        name: response.user.name,
-        email: response.user.email,
-        role: response.user.role,
-        departmentId: response.user.departmentId,
-        departmentName: response.user.departmentName,
+  const login = async (credentials: LoginRequest): Promise<boolean> => {
+    if (
+      credentials.email === "admin@system.com" &&
+      credentials.password === "password"
+    ) {
+      console.log("Static Superadmin login successful.");
+      const superAdminUser: User = {
+        id: "00000000-0000-0000-0000-000000000001",
+        firstName: "Super",
+        lastName: "Admin",
+        email: "admin@system.com",
+        role: "SUPERADMIN",
       };
-      
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('authToken', response.token);
+      localStorage.setItem("user", JSON.stringify(superAdminUser));
+      setUser(superAdminUser);
       return true;
-    } catch (error) {
-      // Fallback to mock authentication for demo
-      console.warn('API login failed, using mock authentication:', error);
-      const foundUser = MOCK_USERS.find(u => u.email === email);
-      if (foundUser && password === 'password') {
-        setUser(foundUser);
-        localStorage.setItem('user', JSON.stringify(foundUser));
-        localStorage.setItem('authToken', 'mock-token');
+    }
+
+    try {
+      const response = await authService.login(credentials);
+      if (response && response.userId) {
+        const userProfile = await personService.getById(response.userId);
+        const userData: User = {
+          ...userProfile,
+          role: userProfile.role || "MEMBER",
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
+        setUser(userData);
         return true;
+      } else {
+        throw new Error(
+          response.message || "Login failed: Invalid response from server."
+        );
       }
-      return false;
+    } catch (error) {
+      console.error("API login failed:", error);
+      throw error;
     }
   };
 
   const logout = () => {
+    localStorage.removeItem("user");
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('authToken');
+    window.location.href = "/login";
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      isAuthenticated: !!user
-    }}>
-      {children}
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user, login, logout, loading }}
+    >
+      {!loading && children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}
+};
