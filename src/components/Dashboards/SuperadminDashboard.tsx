@@ -45,8 +45,10 @@ import {
   Activity,
   Edit,
   Building,
+  Search,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 
 // --- API Service Imports ---
 import { departmentService } from "@/api/services/department.service";
@@ -130,6 +132,9 @@ const INITIAL_PERSON_FORM_STATE = {
   email: "",
   password: "",
   departmentId: "",
+  address: "",
+  gender: "Male",
+  phoneNumber: "",
 };
 const INITIAL_DEPARTMENT_FORM_STATE = { name: "", district: "" };
 const INITIAL_CASE_FORM_STATE = {
@@ -155,8 +160,6 @@ export function SuperadminDashboard() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
@@ -202,6 +205,8 @@ export function SuperadminDashboard() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
+  const [caseIdSearch, setCaseIdSearch] = useState("");
+  const [searchedCase, setSearchedCase] = useState<Case | null>(null);
 
   const fetchData = useCallback(async (refresh = false) => {
     try {
@@ -248,28 +253,6 @@ export function SuperadminDashboard() {
     fetchData();
   }, [fetchData]);
 
-  const stopAutoRefresh = useCallback(() => {
-    if (refreshInterval.current) {
-      clearInterval(refreshInterval.current);
-      refreshInterval.current = null;
-    }
-  }, []);
-  const startAutoRefresh = useCallback(() => {
-    if (refreshInterval.current) clearInterval(refreshInterval.current);
-    refreshInterval.current = setInterval(() => {
-      fetchData(true);
-    }, 30000);
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (autoRefresh) {
-      startAutoRefresh();
-    } else {
-      stopAutoRefresh();
-    }
-    return () => stopAutoRefresh();
-  }, [autoRefresh, startAutoRefresh, stopAutoRefresh]);
-
   const departmentMap = useMemo(
     () => new Map(departments.map((dept) => [dept.id, dept])),
     [departments]
@@ -283,9 +266,13 @@ export function SuperadminDashboard() {
       cases.reduce(
         (acc, c) => {
           acc.total++;
-          if (c.status === "active") acc.active++;
-          else if (c.status === "resolved") acc.resolved++;
-          else if (c.status === "pending") acc.pending++;
+          if (
+            c.status.toLowerCase().includes("investigating") ||
+            c.status.toLowerCase().includes("reported")
+          )
+            acc.active++;
+          else if (c.status.toLowerCase().includes("closed")) acc.resolved++;
+          else acc.pending++;
           return acc;
         },
         { total: 0, active: 0, resolved: 0, pending: 0 }
@@ -388,8 +375,7 @@ export function SuperadminDashboard() {
       setInfoModal({
         isOpen: true,
         title: "Error",
-        message:
-          "Failed to delete department. It may have associated personnel.",
+        message: "Failed to delete department.",
         isError: true,
       });
     }
@@ -398,11 +384,11 @@ export function SuperadminDashboard() {
     setConfirmationModal({
       isOpen: true,
       title: "Confirm Deletion",
-      message:
-        "Are you sure you want to delete this department? This action cannot be undone.",
+      message: "Are you sure you want to delete this department?",
       onConfirm: () => handleDeleteDepartment(departmentId),
     });
   };
+
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
@@ -410,9 +396,19 @@ export function SuperadminDashboard() {
       !personForm.lastName ||
       !personForm.email ||
       !personForm.password ||
-      !personForm.departmentId
-    )
+      !personForm.departmentId ||
+      !personForm.address ||
+      !personForm.gender ||
+      !personForm.phoneNumber
+    ) {
+      setInfoModal({
+        isOpen: true,
+        title: "Validation Error",
+        message: "Please fill out all required fields.",
+        isError: true,
+      });
       return;
+    }
     const roleForBackend =
       personModalType === "police" ? "SUPERVISOR" : "MEMBER";
     try {
@@ -423,6 +419,9 @@ export function SuperadminDashboard() {
         password: personForm.password,
         departmentId: personForm.departmentId,
         role: roleForBackend,
+        address: personForm.address,
+        gender: personForm.gender,
+        phoneNumber: personForm.phoneNumber,
       });
       await fetchData(true);
       setIsPersonModalOpen(false);
@@ -437,11 +436,12 @@ export function SuperadminDashboard() {
       setInfoModal({
         isOpen: true,
         title: "Error",
-        message: `Failed to add ${personModalType}.`,
+        message: `Failed to add ${personModalType}. Check console for details.`,
         isError: true,
       });
     }
   };
+
   const handleEditPerson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editPersonState.person) return;
@@ -469,8 +469,6 @@ export function SuperadminDashboard() {
       });
     }
   };
-
-  // ✅ FIXED: Changed personId parameter from number to string.
   const handleDeletePerson = async (personId: string) => {
     try {
       await personService.deletePerson(personId);
@@ -490,13 +488,11 @@ export function SuperadminDashboard() {
       });
     }
   };
-
   const confirmDeletePerson = (personId: string) => {
     setConfirmationModal({
       isOpen: true,
       title: "Confirm Deletion",
-      message:
-        "Are you sure you want to delete this person? This action cannot be undone.",
+      message: "Are you sure you want to delete this person?",
       onConfirm: () => handleDeletePerson(personId),
     });
   };
@@ -535,7 +531,6 @@ export function SuperadminDashboard() {
     setPersonForm({ ...INITIAL_PERSON_FORM_STATE, departmentId: deptId || "" });
     setIsPersonModalOpen(true);
   };
-
   const openPostModal = (department?: Department) => {
     let initialDept: "POLICE" | "DICE" | "ADMINISTRATION" = "POLICE";
     if (department) {
@@ -547,7 +542,6 @@ export function SuperadminDashboard() {
     setPostForm({ ...INITIAL_POST_FORM_STATE, department: initialDept });
     setIsPostModalOpen(true);
   };
-
   const openEditPersonModal = (person: Person) => {
     setEditPersonState({ isOpen: true, person: person });
     setEditPersonForm({
@@ -579,34 +573,59 @@ export function SuperadminDashboard() {
       });
     }
   };
+  const handleCaseSearch = async () => {
+    if (!caseIdSearch.trim()) return;
+    setIsLoading(true);
+    try {
+      const foundCase = await caseService.getById(caseIdSearch.trim());
+      setSearchedCase(foundCase);
+    } catch (error) {
+      setSearchedCase(null);
+      setInfoModal({
+        isOpen: true,
+        title: "Not Found",
+        message: `Case with ID "${caseIdSearch}" was not found.`,
+        isError: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const clearCaseSearch = () => {
+    setCaseIdSearch("");
+    setSearchedCase(null);
+  };
 
   const renderLoadingSkeletons = () => (
     <div className="p-6 space-y-8">
       {" "}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {" "}
-        <Skeleton className="h-28" /> <Skeleton className="h-28" />{" "}
-        <Skeleton className="h-28" /> <Skeleton className="h-28" />{" "}
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />{" "}
       </div>{" "}
       <Skeleton className="h-64" />{" "}
     </div>
   );
-
   const renderOverview = () => (
     <div className="space-y-6">
+      {" "}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {" "}
         <Card>
           {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Total Departments
             </CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>{" "}
           <CardContent>
             <div className="text-2xl font-bold">{departments.length}</div>
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -618,7 +637,7 @@ export function SuperadminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{persons.length}</div>
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -628,23 +647,24 @@ export function SuperadminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{posts.length}</div>
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Cases</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Cases</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>{" "}
           <CardContent>
-            <div className="text-2xl font-bold">{caseStats.active}</div>
+            <div className="text-2xl font-bold">{cases.length}</div>
           </CardContent>{" "}
-        </Card>
-      </div>
+        </Card>{" "}
+      </div>{" "}
       <div className="grid gap-6 lg:grid-cols-2">
+        {" "}
         <Card>
           {" "}
           <CardHeader>
-            <CardTitle>Posts by Department</CardTitle>
+            <CardTitle>Posts by Department Type</CardTitle>
             <CardDescription>Breakdown of all official posts.</CardDescription>
           </CardHeader>{" "}
           <CardContent>
@@ -672,7 +692,7 @@ export function SuperadminDashboard() {
               ))}{" "}
             </div>{" "}
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader>
@@ -694,26 +714,13 @@ export function SuperadminDashboard() {
               </div>
             ))}{" "}
           </CardContent>{" "}
-        </Card>
-      </div>
+        </Card>{" "}
+      </div>{" "}
     </div>
   );
-
   const renderDepartmentDetails = () => {
     const dept = departments.find((d) => d.id === selectedDepartment);
     if (!dept) return <div>Department not found.</div>;
-
-    const deptMembers = persons.filter(
-      (p) =>
-        p.departmentId === selectedDepartment &&
-        `${p.firstName} ${p.lastName}`
-          .toLowerCase()
-          .includes(memberSearchTerm.toLowerCase())
-    );
-    const deptCases = cases.filter(
-      (c) => c.departmentId === selectedDepartment
-    );
-
     const getDeptCategory = (deptName: string) => {
       const name = deptName.toLowerCase();
       if (name.includes("police")) return "POLICE";
@@ -722,31 +729,46 @@ export function SuperadminDashboard() {
       return null;
     };
     const departmentCategory = getDeptCategory(dept.name);
+    const deptMembers = persons.filter(
+      (p) =>
+        p.department === departmentCategory &&
+        `${p.firstName} ${p.lastName}`
+          .toLowerCase()
+          .includes(memberSearchTerm.toLowerCase())
+    );
+    const deptCases = cases.filter(
+      (c) => c.departmentId === selectedDepartment
+    );
     const deptPosts = departmentCategory
       ? posts.filter((p) => p.department === departmentCategory)
       : [];
-
     return (
       <div className="space-y-6">
+        {" "}
         <div className="flex items-center justify-between">
+          {" "}
           <h2 className="text-3xl font-bold flex items-center gap-3">
             <Building /> {dept.name}
-          </h2>
+          </h2>{" "}
           <div className="flex gap-2">
+            {" "}
             <Button onClick={() => openPersonModal("person", dept.id)}>
               <UserPlus className="h-4 w-4 mr-2" /> Add Personnel
-            </Button>
+            </Button>{" "}
             <Button onClick={() => openPostModal(dept)}>
               <Plus className="h-4 w-4 mr-2" /> Add Post
-            </Button>
-          </div>
-        </div>
+            </Button>{" "}
+          </div>{" "}
+        </div>{" "}
         <Card>
+          {" "}
           <CardHeader>
             <CardTitle>Department Posts</CardTitle>
-          </CardHeader>
+          </CardHeader>{" "}
           <CardContent>
+            {" "}
             <div className="space-y-2">
+              {" "}
               {deptPosts.length > 0 ? (
                 deptPosts.map((post) => (
                   <div
@@ -762,10 +784,10 @@ export function SuperadminDashboard() {
                 <p className="text-center text-gray-500 py-4">
                   No posts found for this department type.
                 </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              )}{" "}
+            </div>{" "}
+          </CardContent>{" "}
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader>
@@ -825,12 +847,12 @@ export function SuperadminDashboard() {
               ))}{" "}
               {deptMembers.length === 0 && (
                 <p className="text-center text-gray-500 py-4">
-                  No personnel found.
+                  No personnel found for this department type.
                 </p>
               )}{" "}
             </div>{" "}
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
         <Card>
           {" "}
           <CardHeader>
@@ -877,75 +899,115 @@ export function SuperadminDashboard() {
               </p>
             )}{" "}
           </CardContent>{" "}
-        </Card>
+        </Card>{" "}
       </div>
     );
   };
-
-  const renderIssuesList = (status: "active" | "pending" | "resolved") => {
-    const filteredCases = cases.filter(
-      (c) =>
-        c.status === status &&
-        (locationFilter === "all" ||
-          departmentMap.get(c.departmentId)?.district === locationFilter) &&
-        c.title.toLowerCase().includes(issueSearchTerm.toLowerCase())
-    );
+  const renderIssuesList = (
+    statusString: "active" | "pending" | "resolved"
+  ) => {
+    const casesToDisplay = searchedCase
+      ? [searchedCase]
+      : cases.filter((c) => {
+          const caseStatus = c.status.toLowerCase();
+          let matches = false;
+          if (statusString === "active")
+            matches =
+              caseStatus.includes("investigating") ||
+              caseStatus.includes("reported");
+          else if (statusString === "resolved")
+            matches = caseStatus.includes("closed");
+          else if (statusString === "pending")
+            matches = !["investigating", "reported", "closed"].some((s) =>
+              caseStatus.includes(s)
+            );
+          return (
+            matches &&
+            (locationFilter === "all" || c.district === locationFilter) &&
+            c.complainantName
+              .toLowerCase()
+              .includes(issueSearchTerm.toLowerCase())
+          );
+        });
     return (
       <div className="space-y-6">
         {" "}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {" "}
           <h2 className="text-3xl font-bold capitalize">
-            {status} Issues
+            {statusString} Issues
           </h2>{" "}
           <div className="flex items-center gap-2 w-full md:w-auto">
             {" "}
             <Input
               className="w-full md:w-48"
-              placeholder="Search..."
+              placeholder="Search by Complainant..."
               value={issueSearchTerm}
               onChange={(e) => setIssueSearchTerm(e.target.value)}
             />{" "}
             <Select value={locationFilter} onValueChange={setLocationFilter}>
+              {" "}
               <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter by location..." />
-              </SelectTrigger>
+                <SelectValue placeholder="Filter by District..." />
+              </SelectTrigger>{" "}
               <SelectContent>
-                <SelectItem value="all">All Subdivisions</SelectItem>
-                {TRIPURA_SUBDIVISIONS.map((sub) => (
-                  <SelectItem key={sub} value={sub}>
-                    {sub}
+                <SelectItem value="all">All Districts</SelectItem>
+                {[...new Set(cases.map((c) => c.district))].map((dist) => (
+                  <SelectItem key={dist} value={dist}>
+                    {dist}
                   </SelectItem>
                 ))}
-              </SelectContent>
+              </SelectContent>{" "}
             </Select>{" "}
             <Button onClick={() => setIsCreateCaseModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Create Case
             </Button>{" "}
           </div>{" "}
         </div>{" "}
+        <Card>
+          {" "}
+          <CardHeader>
+            <CardTitle className="text-base">Find Case by ID</CardTitle>
+          </CardHeader>{" "}
+          <CardContent className="flex items-center gap-2">
+            {" "}
+            <Input
+              placeholder="Enter full Case ID (UUID)..."
+              value={caseIdSearch}
+              onChange={(e) => setCaseIdSearch(e.target.value)}
+            />{" "}
+            <Button onClick={handleCaseSearch}>
+              <Search className="h-4 w-4 mr-2" /> Find
+            </Button>{" "}
+            {searchedCase && (
+              <Button variant="outline" onClick={clearCaseSearch}>
+                Clear Search
+              </Button>
+            )}{" "}
+          </CardContent>{" "}
+        </Card>{" "}
         <div className="space-y-4">
           {" "}
-          {filteredCases.length > 0 ? (
-            filteredCases.map((caseItem) => (
+          {casesToDisplay.length > 0 ? (
+            casesToDisplay.map((caseItem) => (
               <Card key={caseItem.id}>
                 {" "}
                 <CardContent className="p-4 flex items-center justify-between">
                   {" "}
                   <div>
                     {" "}
-                    <h3 className="font-semibold">{caseItem.title}</h3>{" "}
+                    <h3 className="font-semibold">
+                      Complainant: {caseItem.complainantName}
+                    </h3>{" "}
                     <div className="text-sm text-gray-600 mt-1">
-                      <Badge variant="secondary">
-                        {departmentMap.get(caseItem.departmentId)?.district ||
-                          "N/A"}
+                      <Badge variant="secondary">{caseItem.district}</Badge>
+                      <Badge variant="outline" className="ml-2">
+                        {caseItem.status}
                       </Badge>
                     </div>{" "}
                     <p className="text-sm text-gray-500 mt-1">
-                      Created:{" "}
-                      {caseItem.createdAt
-                        ? new Date(caseItem.createdAt).toLocaleDateString()
-                        : "N/A"}
+                      Reported:{" "}
+                      {new Date(caseItem.reportedAt).toLocaleDateString()}
                     </p>{" "}
                   </div>{" "}
                   <Button
@@ -960,8 +1022,7 @@ export function SuperadminDashboard() {
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-gray-500">
-                No {status} issues found. (Backend endpoint `GET /api/cases` is
-                needed)
+                No {statusString} issues found for the selected filters.
               </CardContent>
             </Card>
           )}{" "}
@@ -969,7 +1030,6 @@ export function SuperadminDashboard() {
       </div>
     );
   };
-
   const Sidebar = (
     <nav className="p-4 bg-gray-50 h-full dark:bg-gray-900">
       {" "}
@@ -1262,9 +1322,8 @@ export function SuperadminDashboard() {
               Add New{" "}
               {personModalType === "police" ? "Police Officer" : "Personnel"}
             </DialogTitle>
-          </DialogHeader>{" "}
+          </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
-            {" "}
             <div>
               <Label htmlFor="person-fname">First Name</Label>
               <Input
@@ -1275,7 +1334,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="person-lname">Last Name</Label>
               <Input
@@ -1286,7 +1345,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="person-email">Email</Label>
               <Input
@@ -1298,7 +1357,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="person-password">Temporary Password</Label>
               <Input
@@ -1310,7 +1369,48 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
+            <div>
+              <Label htmlFor="person-phone">Phone Number</Label>
+              <Input
+                id="person-phone"
+                value={personForm.phoneNumber}
+                onChange={(e) =>
+                  setPersonForm((p) => ({ ...p, phoneNumber: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="person-gender">Gender</Label>
+              <Select
+                required
+                value={personForm.gender}
+                onValueChange={(value) =>
+                  setPersonForm((p) => ({ ...p, gender: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="person-address">Address</Label>
+              <Textarea
+                id="person-address"
+                value={personForm.address}
+                onChange={(e) =>
+                  setPersonForm((p) => ({ ...p, address: e.target.value }))
+                }
+                required
+              />
+            </div>
             <div>
               <Label htmlFor="person-dept">Department</Label>
               <Select
@@ -1331,7 +1431,7 @@ export function SuperadminDashboard() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>{" "}
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -1343,8 +1443,8 @@ export function SuperadminDashboard() {
               <Button type="submit">
                 Add {personModalType === "police" ? "Officer" : "Personnel"}
               </Button>
-            </DialogFooter>{" "}
-          </form>{" "}
+            </DialogFooter>
+          </form>
         </DialogContent>{" "}
       </Dialog>
       <Dialog
@@ -1581,14 +1681,14 @@ export function SuperadminDashboard() {
         {" "}
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{selectedCaseDetails?.title}</DialogTitle>
+            <DialogTitle>{selectedCaseDetails?.complainantName}</DialogTitle>
             <DialogDescription>
               Case ID: {selectedCaseDetails?.id} | Status:{" "}
               <Badge
                 variant={
-                  selectedCaseDetails?.status === "active"
+                  selectedCaseDetails?.status === "INVESTIGATING"
                     ? "destructive"
-                    : selectedCaseDetails?.status === "resolved"
+                    : selectedCaseDetails?.status === "CLOSED"
                     ? "default"
                     : "secondary"
                 }

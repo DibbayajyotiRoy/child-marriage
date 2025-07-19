@@ -1,62 +1,68 @@
-// ✅ Use relative path for the Vite proxy
+// ✅ Use a relative path for the Vite proxy to forward requests to the backend.
 const API_BASE_URL = '/api';
 
 export const endpoints = {
   // TeamFormation uses UUIDs (string) for all its IDs
   teamFormation: {
-    create: () => `${API_BASE_URL}/team-formations`,
-    initiate: (caseId: string) => `${API_BASE_URL}/team-formations/initiate/${caseId}`,
-    submitResponse: (teamId: string) => `${API_BASE_URL}/team-formations/response/${teamId}`,
     getByCaseId: (caseId: string) => `${API_BASE_URL}/team-formations/case/${caseId}`,
+    create: () => `${API_BASE_URL}/team-formations`,
+    submitResponse: (teamId: string) => `${API_BASE_URL}/team-formations/response/${teamId}`,
+    initiate: (caseId: string) => `${API_BASE_URL}/team-formations/initiate/${caseId}`,
   },
 
   // Report uses Long (number) for its own ID, but UUIDs (string) for foreign keys
   reports: {
-    create: () => `${API_BASE_URL}/reports`,
-    getById: (id: number) => `${API_BASE_URL}/reports/${id}`,
-    update: (id: number) => `${API_BASE_URL}/reports/${id}`,
     delete: (id: number) => `${API_BASE_URL}/reports/${id}`,
-    getByCaseId: (caseId: string) => `${API_BASE_URL}/reports/case/${caseId}`,
+    getById: (id: number) => `${API_BASE_URL}/reports/${id}`,
     getByPersonId: (personId: string) => `${API_BASE_URL}/reports/team-member/${personId}`,
+    getByCaseId: (caseId: string) => `${API_BASE_URL}/reports/case/${caseId}`,
+    create: () => `${API_BASE_URL}/reports`,
+    update: (id: number) => `${API_BASE_URL}/reports/${id}`,
   },
 
-  // Case uses UUIDs (string)
-  cases: {
-    create: () => `${API_BASE_URL}/cases`,
-    getById: (id: string) => `${API_BASE_URL}/cases/${id}`,
+  // Post uses UUIDs (string)
+  posts: {
+    delete: (id: string) => `${API_BASE_URL}/posts/${id}`,
+    getById: (id: string) => `${API_BASE_URL}/posts/${id}`,
+    getAll: () => `${API_BASE_URL}/posts`,
+    create: () => `${API_BASE_URL}/posts`,
+    update: (id: string) => `${API_BASE_URL}/posts/${id}`,
   },
 
   // Person uses UUIDs (string)
   persons: {
-    getAll: () => `${API_BASE_URL}/persons`,
-    getById: (id: string) => `${API_BASE_URL}/persons/${id}`,
-    create: () => `${API_BASE_URL}/persons`,
-    update: (id: string) => `${API_BASE_URL}/persons/${id}`,
     delete: (id: string) => `${API_BASE_URL}/persons/${id}`,
+    getById: (id: string) => `${API_BASE_URL}/persons/${id}`,
+    getAll: () => `${API_BASE_URL}/persons`,
+    create: () => `${API_BASE_URL}/persons`,
     createBulk: () => `${API_BASE_URL}/persons/bulk`,
-  },
-  
-  // Post uses UUIDs (string)
-  posts: {
-    getAll: () => `${API_BASE_URL}/posts`,
-    getById: (id: string) => `${API_BASE_URL}/posts/${id}`,
-    create: () => `${API_BASE_URL}/posts`,
-    update: (id: string) => `${API_BASE_URL}/posts/${id}`,
-    delete: (id: string) => `${API_BASE_URL}/posts/${id}`,
+    update: (id: string) => `${API_BASE_URL}/persons/${id}`,
   },
 
   // Department uses UUIDs (string)
   departments: {
-    getAll: () => `${API_BASE_URL}/departments`,
+    delete: (id: string) => `${API_BASE_URL}/departments/${id}`,
     getById: (id: string) => `${API_BASE_URL}/departments/${id}`,
+    getAll: () => `${API_BASE_URL}/departments`,
     create: () => `${API_BASE_URL}/departments`,
     update: (id: string) => `${API_BASE_URL}/departments/${id}`,
-    delete: (id: string) => `${API_BASE_URL}/departments/${id}`,
+  },
+
+  // Case uses UUIDs (string)
+  cases: {
+    getAll: () => `${API_BASE_URL}/cases`,
+    getById: (id: string) => `${API_BASE_URL}/cases/${id}`,
+    create: () => `${API_BASE_URL}/cases`,
   },
   
-  // Auth has no IDs and a different base path
+  // Auth has a different base path and no IDs
   auth: {
     login: () => `/auth/login`,
     logout: () => `/auth/logout`,
+  },
+  
+  // Health check has no prefix
+  health: {
+    check: () => `/hi`,
   },
 };

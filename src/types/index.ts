@@ -1,16 +1,53 @@
 // src/types.ts
 
+// ✅ FIXED: This interface now matches the detailed JSON structure from your API
 export interface Case {
   id: string; 
-  title: string;
+  complainantName: string;
+  complainantPhone: string;
+  caseAddress: string;
+  district: string;
+  state: string;
   description: string;
-  status: 'active' | 'pending' | 'resolved';
+  reportedAt: string;
   createdBy: string; 
-  departmentId: string; 
-  finalReportSubmitted: boolean;
-  createdAt?: string; 
-  updatedAt?: string;
+  status: 'REPORTED' | 'INVESTIGATING' | 'CLOSED' | 'active' | 'pending' | 'resolved'; // Include all possible statuses
+  createdAt: string; 
+  updatedAt: string;
+  // This represents the nested details object
+  caseDetails: CaseDetail[];
 }
+
+// ✅ ADDED: A new type for the nested caseDetails object
+export interface CaseDetail {
+    id: string;
+    caseId: string;
+    notes: string;
+    evidencePath: string;
+    createdAt: string;
+    updatedAt: string;
+    policeMembers: string[];
+    diceMembers: string[];
+    adminMembers: string[];
+    supervisorId: string;
+    marriageDate: string;
+    boyName: string;
+    boyFatherName: string;
+    boyAddress: string;
+    boyAge: number;
+    girlName: string;
+    girlFatherName: string;
+    girlAge: number;
+    girlAddress: string;
+    girlVillage: string;
+    girlPoliceStation: string;
+    girlPostOffice: string;
+    girlSubdivision: string;
+    girlDistrict: string;
+    teamId: string;
+    marriageAddress: string;
+}
+
 
 export interface TeamFormation {
   team_id: string; 
@@ -39,8 +76,7 @@ export interface Person {
   email: string;
   department?: string;
   departmentId?: string;
-  // ✅ FIXED: Role now includes 'SUPERADMIN' to match all possible user types.
-  role?: 'MEMBER' | 'SUPERVISOR' | 'SUPERADMIN';
+  role?: 'MEMBER' | 'SUPERVISOR' | 'SUPERADMIN'; 
 }
 
 export interface Department {

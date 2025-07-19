@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Mail, Lock, AlertCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom"; // Using react-router-dom for navigation
+import { useNavigate } from "react-router-dom";
 
 export function LoginForm() {
   const [email, setEmail] = useState("admin@system.com");
@@ -30,19 +30,17 @@ export function LoginForm() {
     setError("");
 
     try {
-      // ✅ CRITICAL FIX: Pass a single object { email, password }
+      // ✅ CRITICAL FIX: Pass a single object { email, password } to the login function.
+      // This will prevent the "JSON parse error" and the "Invalid salt" error.
       const success = await login({ email, password });
 
       if (success) {
-        // Redirect logic based on user role can be added here
-        // For now, we redirect all successful logins to the superadmin dashboard
-        navigate("/superadmin-dashboard");
+        // Redirect logic can be more sophisticated based on user role if needed
+        navigate("/"); // Redirect to the index page, which will then show the correct dashboard
       }
     } catch (err) {
-      console.error(err);
-      setError(
-        "An error occurred during login. Please check your credentials."
-      );
+      console.error("Login submit error:", err);
+      setError("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -112,19 +110,7 @@ export function LoginForm() {
                 <strong>Super Admin:</strong> admin@system.com
               </p>
               <p>
-                <strong>Department Member:</strong> john@tech.com
-              </p>
-              <p>
-                <strong>Police:</strong> smith@police.com
-              </p>
-              <p>
-                <strong>DICE:</strong> johnson@dice.com
-              </p>
-              <p>
-                <strong>Admin:</strong> wilson@admin.com
-              </p>
-              <p className="mt-2 font-medium">
-                Password: <code>password</code>
+                <strong>Password:</strong> password
               </p>
             </div>
           </div>

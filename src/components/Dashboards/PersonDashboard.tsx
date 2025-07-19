@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+// ✅ FIXED: Added Mail to the import list
 import {
   AlertCircle,
   Clock,
@@ -31,6 +32,9 @@ import {
   Save,
   X,
   MessageSquare,
+  Phone,
+  Mail,
+  MapPin,
   Building,
 } from "lucide-react";
 import type { Case, TeamFormation, Person, Report } from "@/types";
@@ -68,7 +72,6 @@ export function PersonDashboard() {
       );
       setCases(userCases);
 
-      // ✅ FIXED: Use the correct, existing getByPersonId method
       const userReports = await reportService.getByPersonId(user.id);
       setReports(userReports);
     } catch (error) {
@@ -82,9 +85,9 @@ export function PersonDashboard() {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  const activeCases = cases.filter((c) => c.status === "active");
-  const pendingCases = cases.filter((c) => c.status === "pending");
-  const resolvedCases = cases.filter((c) => c.status === "resolved");
+  const activeCases = cases.filter((case_) => case_.status === "active");
+  const pendingCases = cases.filter((case_) => case_.status === "pending");
+  const resolvedCases = cases.filter((case_) => case_.status === "resolved");
 
   const sidebarItems = [
     {
@@ -170,7 +173,6 @@ export function PersonDashboard() {
   const handleSubmitReport = async () => {
     if (selectedCase && reportContent.trim() && user) {
       try {
-        // ✅ FIXED: All IDs are now correctly passed as strings (UUIDs)
         await reportService.create({
           caseId: selectedCase.id,
           personId: user.id,

@@ -8,9 +8,9 @@ import React, {
 } from "react";
 import { authService, LoginRequest } from "@/api/services/auth.service";
 import { personService } from "@/api/services/person.service";
-import type { Person } from "@/types"; // Import your main Person type
+import type { Person } from "@/types";
 
-// ✅ FIXED: The User type now correctly extends the updated Person type without conflict.
+// This interface is now valid because the base Person type was updated.
 export interface User extends Person {
   role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
 }
@@ -51,7 +51,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       credentials.email === "admin@system.com" &&
       credentials.password === "password"
     ) {
-      console.log("Static Superadmin login successful.");
       const superAdminUser: User = {
         id: "00000000-0000-0000-0000-000000000001",
         firstName: "Super",
@@ -89,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
-    window.location.href = "/login";
+    window.location.href = "/"; // Go back to the index page on logout
   };
 
   return (
