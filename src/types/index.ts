@@ -1,54 +1,93 @@
 // src/types.ts
 
+// ✅ FIXED: This interface now matches the detailed JSON structure from your API
 export interface Case {
-  id: number;
-  title: string;
+  id: string; 
+  complainantName: string;
+  complainantPhone: string;
+  caseAddress: string;
+  district: string;
+  state: string;
   description: string;
-  status: 'active' | 'pending' | 'resolved';
-  createdBy: number;
-  departmentId: number;
-  finalReportSubmitted: boolean;
-  createdAt: string;
+  reportedAt: string;
+  createdBy: string; 
+  status: 'REPORTED' | 'INVESTIGATING' | 'CLOSED' | 'active' | 'pending' | 'resolved'; // Include all possible statuses
+  createdAt: string; 
+  updatedAt: string;
+  // This represents the nested details object
+  caseDetails: CaseDetail[];
 }
 
+// ✅ ADDED: A new type for the nested caseDetails object
+export interface CaseDetail {
+    id: string;
+    caseId: string;
+    notes: string;
+    evidencePath: string;
+    createdAt: string;
+    updatedAt: string;
+    policeMembers: string[];
+    diceMembers: string[];
+    adminMembers: string[];
+    supervisorId: string;
+    marriageDate: string;
+    boyName: string;
+    boyFatherName: string;
+    boyAddress: string;
+    boyAge: number;
+    girlName: string;
+    girlFatherName: string;
+    girlAge: number;
+    girlAddress: string;
+    girlVillage: string;
+    girlPoliceStation: string;
+    girlPostOffice: string;
+    girlSubdivision: string;
+    girlDistrict: string;
+    teamId: string;
+    marriageAddress: string;
+}
+
+
 export interface TeamFormation {
-  id: number;
-  caseId: number;
-  createdBy: number;
-  members: {
-    personId: number;
-    status: 'pending' | 'accepted' | 'rejected';
-  }[];
-  createdAt: string;
+  team_id: string; 
+  case_id: string; 
+  supervisor_id: string;
+  member_ids: string[];
+  admin_status?: string;
+  police_status?: string;
+  dice_status?: string;
+  response_status?: string;
+  formed_at?: string;
 }
 
 export interface Report {
-  id: number;
-  caseId: number;
-  submittedBy: number;
-  teamFormationId: number;
+  id: number; 
+  caseId: string; 
+  personId: string;
   content: string;
   submittedAt: string;
 }
 
 export interface Person {
-  id: number;
-  name: string;
+  id: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  // Note: Password should generally not be sent to the client.
-  password?: string;
-  departmentId: number;
-  role: 'superadmin' | 'person' | 'police';
+  department?: string;
+  departmentId?: string;
+  role?: 'MEMBER' | 'SUPERVISOR' | 'SUPERADMIN'; 
 }
 
 export interface Department {
-  id: number;
+  id: string;
   name: string;
   district: string;
 }
 
-export interface Admin {
-  id: number;
-  email: string;
-  password?: string;
+export interface Post {
+  id: string;
+  postName: string;
+  department: 'POLICE' | 'DICE' | 'ADMINISTRATION';
+  rank: number;
 }

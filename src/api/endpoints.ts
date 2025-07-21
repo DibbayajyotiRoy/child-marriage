@@ -1,76 +1,68 @@
-const API_BASE_URL = 'http://localhost:8080'; // Updated to match your backend port
+// ✅ Use a relative path for the Vite proxy to forward requests to the backend.
+const API_BASE_URL = '/api';
 
 export const endpoints = {
-  // Team Formations
+  // TeamFormation uses UUIDs (string) for all its IDs
   teamFormation: {
-    getAll: () => `${API_BASE_URL}/api/team-formations`,
-    getById: (id: number) => `${API_BASE_URL}/api/team-formations/${id}`,
-    // Response endpoint - specific to team formations
-    submitResponse: (id: number) => `${API_BASE_URL}/api/team-formations/${id}/response`,
-    create: () => `${API_BASE_URL}/api/team-formations`,
-    update: (id: number) => `${API_BASE_URL}/api/team-formations/${id}`,
+    getByCaseId: (caseId: string) => `${API_BASE_URL}/team-formations/case/${caseId}`,
+    create: () => `${API_BASE_URL}/team-formations`,
+    submitResponse: (teamId: string) => `${API_BASE_URL}/team-formations/response/${teamId}`,
+    initiate: (caseId: string) => `${API_BASE_URL}/team-formations/initiate/${caseId}`,
   },
 
-  // Reports
+  // Report uses Long (number) for its own ID, but UUIDs (string) for foreign keys
   reports: {
-    getAll: () => `${API_BASE_URL}/api/reports`,
-    getById: (id: number) => `${API_BASE_URL}/api/reports/${id}`,
-    create: () => `${API_BASE_URL}/api/reports`,
-    update: (id: number) => `${API_BASE_URL}/api/reports/${id}`,
-    delete: (id: number) => `${API_BASE_URL}/api/reports/${id}`,
+    delete: (id: number) => `${API_BASE_URL}/reports/${id}`,
+    getById: (id: number) => `${API_BASE_URL}/reports/${id}`,
+    getByPersonId: (personId: string) => `${API_BASE_URL}/reports/team-member/${personId}`,
+    getByCaseId: (caseId: string) => `${API_BASE_URL}/reports/case/${caseId}`,
+    create: () => `${API_BASE_URL}/reports`,
+    update: (id: number) => `${API_BASE_URL}/reports/${id}`,
   },
 
-  // Cases
-  cases: {
-    getAll: () => `${API_BASE_URL}/api/cases`,
-    getById: (id: number) => `${API_BASE_URL}/api/cases/${id}`,
-    create: () => `${API_BASE_URL}/api/cases`,
-    update: (id: number) => `${API_BASE_URL}/api/cases/${id}`,
-    delete: (id: number) => `${API_BASE_URL}/api/cases/${id}`,
-    // Team assignment endpoint for cases
-    assignTeam: (caseId: number) => `${API_BASE_URL}/api/cases/${caseId}/team`,
+  // Post uses UUIDs (string)
+  posts: {
+    delete: (id: string) => `${API_BASE_URL}/posts/${id}`,
+    getById: (id: string) => `${API_BASE_URL}/posts/${id}`,
+    getAll: () => `${API_BASE_URL}/posts`,
+    create: () => `${API_BASE_URL}/posts`,
+    update: (id: string) => `${API_BASE_URL}/posts/${id}`,
   },
 
-  // Persons
+  // Person uses UUIDs (string)
   persons: {
-    getAll: () => `${API_BASE_URL}/api/persons`,
-    getById: (id: number) => `${API_BASE_URL}/api/persons/${id}`,
-    create: () => `${API_BASE_URL}/api/persons`,
-    update: (id: number) => `${API_BASE_URL}/api/persons/${id}`,
-    delete: (id: number) => `${API_BASE_URL}/api/persons/${id}`,
-    // For login, we'll query by email (if supported by backend)
-    getByEmail: (email: string) => `${API_BASE_URL}/api/persons?email=${email}`,
+    delete: (id: string) => `${API_BASE_URL}/persons/${id}`,
+    getById: (id: string) => `${API_BASE_URL}/persons/${id}`,
+    getAll: () => `${API_BASE_URL}/persons`,
+    create: () => `${API_BASE_URL}/persons`,
+    createBulk: () => `${API_BASE_URL}/persons/bulk`,
+    update: (id: string) => `${API_BASE_URL}/persons/${id}`,
   },
 
-  // Hi Controller (Health Check or Hello endpoint)
-  health: {
-    check: () => `${API_BASE_URL}/hi`,
-  },
-
-  // Additional endpoints that might be needed based on common patterns:
-  
-  // Authentication (if you have login endpoints)
-  auth: {
-    login: () => `${API_BASE_URL}/api/auth/login`,
-    logout: () => `${API_BASE_URL}/api/auth/logout`,
-    register: () => `${API_BASE_URL}/api/auth/register`,
-  },
-
-  // Departments (if you have department management)
+  // Department uses UUIDs (string)
   departments: {
-    getAll: () => `${API_BASE_URL}/api/departments`,
-    getById: (id: number) => `${API_BASE_URL}/api/departments/${id}`,
-    create: () => `${API_BASE_URL}/api/departments`,
-    update: (id: number) => `${API_BASE_URL}/api/departments/${id}`,
-    delete: (id: number) => `${API_BASE_URL}/api/departments/${id}`,
+    delete: (id: string) => `${API_BASE_URL}/departments/${id}`,
+    getById: (id: string) => `${API_BASE_URL}/departments/${id}`,
+    getAll: () => `${API_BASE_URL}/departments`,
+    create: () => `${API_BASE_URL}/departments`,
+    update: (id: string) => `${API_BASE_URL}/departments/${id}`,
   },
 
-  // Admin endpoints (if you have admin-specific operations)
-  admin: {
-    getAll: () => `${API_BASE_URL}/api/admin/users`,
-    getById: (id: number) => `${API_BASE_URL}/api/admin/users/${id}`,
-    create: () => `${API_BASE_URL}/api/admin/users`,
-    update: (id: number) => `${API_BASE_URL}/api/admin/users/${id}`,
-    delete: (id: number) => `${API_BASE_URL}/api/admin/users/${id}`,
+  // Case uses UUIDs (string)
+  cases: {
+    getAll: () => `${API_BASE_URL}/cases`,
+    getById: (id: string) => `${API_BASE_URL}/cases/${id}`,
+    create: () => `${API_BASE_URL}/cases`,
+  },
+  
+  // Auth has a different base path and no IDs
+  auth: {
+    login: () => `/auth/login`,
+    logout: () => `/auth/logout`,
+  },
+  
+  // Health check has no prefix
+  health: {
+    check: () => `/hi`,
   },
 };
