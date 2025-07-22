@@ -1,133 +1,135 @@
-# Modern Issue Management Web Application – Frontend Documentation
+# Child Marriage Management System
 
-Welcome to the frontend codebase for your modern, role-based issue management web application.
+This is a web application built with React, Vite, and TypeScript, designed to manage and track child marriage-related data and cases. It leverages Shadcn UI for a modern and accessible user interface, Tailwind CSS for styling, and a robust API integration layer.
 
----
+## Features
 
-## Project Overview
+*   **User Authentication:** Secure login and protected routes for different user roles.
+*   **Role-Based Dashboards:** Dedicated dashboards for Superadmin, Person, and other user types, providing tailored views and functionalities.
+*   **Comprehensive API Integration:** Seamless interaction with backend services for managing:
+    *   Admin operations
+    *   Authentication
+    *   Case management
+    *   Department information
+    *   Person data
+    *   Post management
+    *   Reporting
+    *   Team formation
+*   **Modern UI Components:** Utilizes Shadcn UI components for a consistent, accessible, and visually appealing user experience.
+*   **Responsive Design:** Built with Tailwind CSS to ensure a responsive layout across various devices.
+*   **State Management:** Efficient data fetching and caching with `@tanstack/react-query`.
+*   **Form Handling:** Robust form validation and management using `react-hook-form` and `zod`.
+*   **Theming:** Context-based theming for a customizable user interface.
 
-This project delivers a full-featured, modern web application with **three distinct dashboards**, each tailored to specific roles within an organization.  
-**Primary goal:** Manage, monitor, and resolve issues raised by external users—efficiently and in real time.
+## Technologies Used
 
----
+*   **Frontend:**
+    *   [React](https://react.dev/)
+    *   [Vite](https://vitejs.dev/)
+    *   [TypeScript](https://www.typescriptlang.org/)
+    *   [Shadcn UI](https://ui.shadcn.com/)
+    *   [Tailwind CSS](https://tailwindcss.com/)
+    *   [React Router DOM](https://reactrouter.com/en/main)
+    *   [@tanstack/react-query](https://tanstack.com/query/latest)
+    *   [React Hook Form](https://react-hook-form.com/)
+    *   [Zod](https://zod.dev/)
+    *   [Lucide React](https://lucide.dev/icons/) (Icons)
+    *   [date-fns](https://date-fns.org/) (Date utilities)
+    *   [Recharts](https://recharts.org/en-US/) (Charting library)
+*   **Tooling:**
+    *   [ESLint](https://eslint.org/)
+    *   [Vite](https://vitejs.dev/)
 
-## 🔑 Key Dashboards & User Roles
+## Project Structure
 
-### Superadmin Dashboard
-- **Purpose:** Manage entire system settings.
-- **Features:**
-  - CRUD operations for:
-    - Departments (e.g., Technical, Support, Field)
-    - Members (Persons working in departments)
-    - Police (special user group)
-    - DICE (another specialized user group)
-  - Administration roles and team hierarchy oversight.
+The project follows a clear and modular structure:
 
-### Person Dashboard (Department Members)
-- **Purpose:** Enable department members to manage issues.
-- **Features:**
-  - Sidebar navigation:
-    - Active Issues
-    - Pending Issues
-    - Resolved Issues
-  - For each issue:
-    - Open detailed view
-    - Submit progress reports
-    - Mark as resolved or escalate
-  - Focus on clarity and task prioritization.
-
-### Others Dashboard (Police, DICE, Admin Roles)
-- **Purpose:** Real-time monitoring and advanced team management.
-- **Features:**
-  - Monitor all system issues in real time.
-  - Form teams by grouping "Person" users from various departments.
-  - Assign issues to teams for resolution.
-  - Alerts for unnoticed or unassigned issues.
-  - Actionable analytics and graphs on unresolved issues, team performance, etc.
-
----
-
-## 🌟 Core Features
-
-- **Role-based authentication and authorization**
-- **Real-time notifications** for new, unassigned, or critical issues
-- **Team management** and role assignment workflows
-- **Issue tracking** with detailed status transitions
-- **Reporting module** for submitting analyses and resolutions
-- **Admin controls** for dynamic user and department management
-
----
-
-## Technology Stack
-
-- [Vite](https://vitejs.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [React](https://react.dev/)
-- [shadcn-ui](https://ui.shadcn.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-
----
+```
+.
+├── public/                 # Static assets
+├── src/                # Source code
+│   ├── api/                # API service definitions and endpoints
+│   │   └── services/       # Individual service modules (admin, auth, case, etc.)
+│   ├── components/         # Reusable UI components
+│   │   ├── Auth/           # Authentication-related components
+│   │   ├── Dashboards/     # Dashboard components for different roles
+│   │   ├── Layout/         # Layout components
+│   │   └── ui/             # Shadcn UI components (customized/extended)
+│   ├── contexts/           # React Contexts for global state (e.g., Auth, Theme)
+│   ├── hooks/              # Custom React hooks
+│   ├── lib/                # Utility functions
+│   ├── pages/              # Main application pages
+│   ├── types/              # TypeScript type definitions
+│   ├── App.tsx             # Main application component
+│   ├── main.tsx            # Entry point for the React application
+│   └── index.css           # Global styles
+├── package.json            # Project dependencies and scripts
+├── tsconfig.json           # TypeScript configuration
+├── tailwind.config.ts      # Tailwind CSS configuration
+└── vite.config.ts          # Vite build configuration
+```
 
 ## Getting Started
 
-You can edit and run the frontend code using any of the following methods:
+Follow these instructions to set up and run the project locally.
 
-### 1. Use Your Preferred IDE
+### Prerequisites
 
-To work locally:
+*   Node.js (v18 or higher recommended)
+*   npm, yarn, or bun (npm is used in examples)
 
-Clone the repository
-git clone https://github.com/DibbayajyotiRoy/child-marriage
+### Installation
 
-Navigate to the project directory
-cd child-marriage
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd child-marriage
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or yarn install
+    # or bun install
+    ```
 
-Install dependencies
-npm i
+### Running the Development Server
 
-Start the development server
+To start the development server:
+
+```bash
 npm run dev
+# or yarn dev
+# or bun dev
+```
 
-text
+The application will be accessible at `http://localhost:5173` (or another port if 5173 is in use).
 
-**Requirements:**  
-- Node.js & npm (install via [nvm](https://github.com/DibbayajyotiRoy/child-marriage))
+### Building for Production
 
-### 2. Edit Directly in GitHub
+To build the application for production:
 
-- Navigate to the desired file(s).
-- Click the "Edit" (pencil) icon.
-- Make your changes and commit.
+```bash
+npm run build
+# or yarn build
+# or bun build
+```
 
-### 3. Use GitHub Codespaces
+This will create a `dist` directory with the optimized production build.
 
-- Go to the repository main page.
-- Click "Code" > "Codespaces" tab > "New codespace".
-- Edit and commit changes within Codespaces.
+### Linting
 
----
+To run the linter:
 
-## Deployment
-
-- Deploy your application using your preferred hosting or CI/CD platform.
-
----
-
-## Custom Domain
-
-- Connect a custom domain via your hosting provider’s domain settings.
-- Configure DNS records as required by your deployment platform.
-
----
+```bash
+npm run lint
+# or yarn lint
+# or bun lint
+```
 
 ## Contributing
 
-We welcome contributions! Please open issues or submit pull requests for improvements, bug fixes, or new features.
+(Optional: Add guidelines for contributing if this is an open-source project)
 
----
+## License
 
-## Support
-
-For questions or support, please contact the maintainers or refer to the project documentation.
-
----
+(Optional: Add license information)
