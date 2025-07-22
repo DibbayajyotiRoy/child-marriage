@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DashboardLayout } from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +51,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 // --- API Service Imports ---
-import { departmentService } from "@/api/services/department.service";
+import {
+  departmentService,
+  type CreateDepartmentRequest,
+} from "@/api/services/department.service";
 import { personService } from "@/api/services/person.service";
 import { caseService } from "@/api/services/case.service";
 import { reportService } from "@/api/services/report.service";
@@ -62,17 +65,30 @@ import { postService } from "@/api/services/post.service";
 import type {
   Department,
   Person as BasePerson,
-  Case,
+  Case as BaseCase,
   TeamFormation,
   Report,
   Post,
 } from "@/types";
 
+// Enriched local types to match expected data structure
 interface Person extends BasePerson {
   departmentId?: string;
+  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
 }
 
-interface CaseDetails extends Case {
+interface EnrichedCase extends BaseCase {
+  id: string;
+  title: string;
+  description: string;
+  departmentId: string;
+  complainantName: string;
+  district: string;
+  status: string;
+  reportedAt: string;
+}
+
+interface CaseDetails extends EnrichedCase {
   reports: Report[];
   teamFormation: TeamFormation | null;
 }
@@ -136,7 +152,10 @@ const INITIAL_PERSON_FORM_STATE = {
   gender: "Male",
   phoneNumber: "",
 };
-const INITIAL_DEPARTMENT_FORM_STATE = { name: "", district: "" };
+const INITIAL_DEPARTMENT_FORM_STATE: CreateDepartmentRequest = {
+  name: "",
+  district: "",
+};
 const INITIAL_CASE_FORM_STATE = {
   title: "",
   description: "",
@@ -145,8 +164,19 @@ const INITIAL_CASE_FORM_STATE = {
 };
 const INITIAL_POST_FORM_STATE = {
   postName: "",
-  department: "POLICE" as "POLICE" | "DICE" | "ADMINISTRATION",
+  departmentId: "",
   rank: 0,
+};
+
+// --- Helper Function ---
+const getDeptCategory = (
+  deptName: string
+): "POLICE" | "DICE" | "ADMINISTRATION" | null => {
+  const name = deptName.toLowerCase();
+  if (name.includes("police")) return "POLICE";
+  if (name.includes("dise")) return "DICE";
+  if (name.includes("admin")) return "ADMINISTRATION";
+  return null;
 };
 
 export function SuperadminDashboard() {
@@ -156,7 +186,7 @@ export function SuperadminDashboard() {
   );
   const [departments, setDepartments] = useState<Department[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
-  const [cases, setCases] = useState<Case[]>([]);
+  const [cases, setCases] = useState<EnrichedCase[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,13 +230,13 @@ export function SuperadminDashboard() {
     firstName: "",
     lastName: "",
     email: "",
-    role: "MEMBER" as "MEMBER" | "SUPERVISOR",
+    role: "MEMBER" as "MEMBER" | "SUPERVISOR" | "SUPERADMIN",
   });
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
   const [caseIdSearch, setCaseIdSearch] = useState("");
-  const [searchedCase, setSearchedCase] = useState<Case | null>(null);
+  const [searchedCase, setSearchedCase] = useState<EnrichedCase | null>(null);
 
   const fetchData = useCallback(async (refresh = false) => {
     try {
@@ -220,7 +250,7 @@ export function SuperadminDashboard() {
         ]);
       setDepartments(deptResult);
       setPersons(personResult as Person[]);
-      setCases(caseResult);
+      setCases(caseResult as EnrichedCase[]);
       setPosts(postResult);
       if (!refresh) {
         setActivityLog([
@@ -304,10 +334,7 @@ export function SuperadminDashboard() {
     e.preventDefault();
     if (!departmentForm.name || !departmentForm.district) return;
     try {
-      await departmentService.create({
-        name: departmentForm.name,
-        district: departmentForm.district,
-      });
+      await departmentService.create(departmentForm);
       await fetchData(true);
       setIsDepartmentModalOpen(false);
       setDepartmentForm(INITIAL_DEPARTMENT_FORM_STATE);
@@ -328,7 +355,7 @@ export function SuperadminDashboard() {
   };
   const handleAddPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postForm.postName || !postForm.department || postForm.rank <= 0) {
+    if (!postForm.postName || !postForm.departmentId || postForm.rank <= 0) {
       setInfoModal({
         isOpen: true,
         title: "Validation Error",
@@ -337,8 +364,39 @@ export function SuperadminDashboard() {
       });
       return;
     }
+
+    const selectedDept = departments.find(
+      (d) => d.id === postForm.departmentId
+    );
+
+    if (!selectedDept) {
+      setInfoModal({
+        isOpen: true,
+        title: "Error",
+        message: "The selected department could not be found.",
+        isError: true,
+      });
+      return;
+    }
+
+    const departmentCategory = getDeptCategory(selectedDept.name);
+
+    if (!departmentCategory) {
+      setInfoModal({
+        isOpen: true,
+        title: "Unrecognized Department Type",
+        message: `Could not determine the category for "${selectedDept.name}". Please ensure the department name contains 'Police', 'DISE', or 'Admin' to assign it a post category.`,
+        isError: true,
+      });
+      return;
+    }
+
     try {
-      await postService.create(postForm);
+      await postService.create({
+        postName: postForm.postName,
+        department: departmentCategory,
+        rank: postForm.rank,
+      });
       await fetchData(true);
       setIsPostModalOpen(false);
       setPostForm(INITIAL_POST_FORM_STATE);
@@ -532,14 +590,10 @@ export function SuperadminDashboard() {
     setIsPersonModalOpen(true);
   };
   const openPostModal = (department?: Department) => {
-    let initialDept: "POLICE" | "DICE" | "ADMINISTRATION" = "POLICE";
-    if (department) {
-      const deptName = department.name.toLowerCase();
-      if (deptName.includes("police")) initialDept = "POLICE";
-      else if (deptName.includes("dise")) initialDept = "DICE";
-      else if (deptName.includes("admin")) initialDept = "ADMINISTRATION";
-    }
-    setPostForm({ ...INITIAL_POST_FORM_STATE, department: initialDept });
+    setPostForm({
+      ...INITIAL_POST_FORM_STATE,
+      departmentId: department ? department.id : "",
+    });
     setIsPostModalOpen(true);
   };
   const openEditPersonModal = (person: Person) => {
@@ -551,7 +605,7 @@ export function SuperadminDashboard() {
       role: person.role || "MEMBER",
     });
   };
-  const openIssueDetailsModal = async (caseItem: Case) => {
+  const openIssueDetailsModal = async (caseItem: EnrichedCase) => {
     try {
       const [caseReportsData, caseTeam] = await Promise.all([
         reportService.getByCaseId(caseItem.id).catch(() => []),
@@ -577,7 +631,9 @@ export function SuperadminDashboard() {
     if (!caseIdSearch.trim()) return;
     setIsLoading(true);
     try {
-      const foundCase = await caseService.getById(caseIdSearch.trim());
+      const foundCase = (await caseService.getById(
+        caseIdSearch.trim()
+      )) as EnrichedCase;
       setSearchedCase(foundCase);
     } catch (error) {
       setSearchedCase(null);
@@ -598,85 +654,70 @@ export function SuperadminDashboard() {
 
   const renderLoadingSkeletons = () => (
     <div className="p-6 space-y-8">
-      {" "}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {" "}
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
-        <Skeleton className="h-28" />{" "}
-      </div>{" "}
-      <Skeleton className="h-64" />{" "}
+        <Skeleton className="h-28" />
+      </div>
+      <Skeleton className="h-64" />
     </div>
   );
   const renderOverview = () => (
     <div className="space-y-6">
-      {" "}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {" "}
         <Card>
-          {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Total Departments
             </CardTitle>
             <Building className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{departments.length}</div>
-          </CardContent>{" "}
-        </Card>{" "}
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Total Personnel
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{persons.length}</div>
-          </CardContent>{" "}
-        </Card>{" "}
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
             <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{posts.length}</div>
-          </CardContent>{" "}
-        </Card>{" "}
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Cases</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{cases.length}</div>
-          </CardContent>{" "}
-        </Card>{" "}
-      </div>{" "}
+          </CardContent>
+        </Card>
+      </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        {" "}
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle>Posts by Department Type</CardTitle>
             <CardDescription>Breakdown of all official posts.</CardDescription>
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
-            {" "}
             <div className="space-y-4">
-              {" "}
               {Object.entries(postStats).map(([dept, count]) => (
                 <div key={dept} className="flex items-center">
-                  {" "}
-                  <span className="w-32 capitalize">
-                    {dept.toLowerCase()}
-                  </span>{" "}
+                  <span className="w-32 capitalize">{dept.toLowerCase()}</span>
                   <div className="flex-1 bg-gray-200 rounded-full h-4 mx-4">
                     <div
                       className="bg-green-600 h-4 rounded-full"
@@ -686,52 +727,43 @@ export function SuperadminDashboard() {
                         }%`,
                       }}
                     />
-                  </div>{" "}
-                  <span className="w-12 text-right font-bold">{count}</span>{" "}
+                  </div>
+                  <span className="w-12 text-right font-bold">{count}</span>
                 </div>
-              ))}{" "}
-            </div>{" "}
-          </CardContent>{" "}
-        </Card>{" "}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>System activity log.</CardDescription>
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent className="space-y-4">
-            {" "}
             {activityLog.map((log) => (
               <div key={log.id} className="flex items-start gap-4">
-                {" "}
-                <Activity className="h-5 w-5 mt-1 text-gray-500" />{" "}
+                <Activity className="h-5 w-5 mt-1 text-gray-500" />
                 <div>
                   <p className="text-sm">{log.activity}</p>
                   <p className="text-xs text-gray-500">
                     {new Date(log.timestamp).toLocaleString()}
                   </p>
-                </div>{" "}
+                </div>
               </div>
-            ))}{" "}
-          </CardContent>{" "}
-        </Card>{" "}
-      </div>{" "}
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
   const renderDepartmentDetails = () => {
     const dept = departments.find((d) => d.id === selectedDepartment);
     if (!dept) return <div>Department not found.</div>;
-    const getDeptCategory = (deptName: string) => {
-      const name = deptName.toLowerCase();
-      if (name.includes("police")) return "POLICE";
-      if (name.includes("dise")) return "DICE";
-      if (name.includes("admin")) return "ADMINISTRATION";
-      return null;
-    };
+
     const departmentCategory = getDeptCategory(dept.name);
     const deptMembers = persons.filter(
       (p) =>
-        p.department === departmentCategory &&
+        p.departmentId === dept.id &&
         `${p.firstName} ${p.lastName}`
           .toLowerCase()
           .includes(memberSearchTerm.toLowerCase())
@@ -744,79 +776,71 @@ export function SuperadminDashboard() {
       : [];
     return (
       <div className="space-y-6">
-        {" "}
         <div className="flex items-center justify-between">
-          {" "}
           <h2 className="text-3xl font-bold flex items-center gap-3">
             <Building /> {dept.name}
-          </h2>{" "}
+          </h2>
           <div className="flex gap-2">
-            {" "}
             <Button onClick={() => openPersonModal("person", dept.id)}>
               <UserPlus className="h-4 w-4 mr-2" /> Add Personnel
-            </Button>{" "}
+            </Button>
             <Button onClick={() => openPostModal(dept)}>
               <Plus className="h-4 w-4 mr-2" /> Add Post
-            </Button>{" "}
-          </div>{" "}
-        </div>{" "}
+            </Button>
+          </div>
+        </div>
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle>Department Posts</CardTitle>
-          </CardHeader>{" "}
+            <CardDescription>
+              Generic posts available to this department type.
+            </CardDescription>
+          </CardHeader>
           <CardContent>
-            {" "}
             <div className="space-y-2">
-              {" "}
               {deptPosts.length > 0 ? (
                 deptPosts.map((post) => (
                   <div
                     key={post.id}
                     className="flex justify-between items-center p-2 border rounded"
                   >
-                    {" "}
-                    <span className="font-medium">{post.postName}</span>{" "}
-                    <Badge>Rank: {post.rank}</Badge>{" "}
+                    <span className="font-medium">{post.postName}</span>
+                    <Badge>Rank: {post.rank}</Badge>
                   </div>
                 ))
               ) : (
                 <p className="text-center text-gray-500 py-4">
-                  No posts found for this department type.
+                  No posts found for this department type. Add one from the main
+                  "Posts" menu.
                 </p>
-              )}{" "}
-            </div>{" "}
-          </CardContent>{" "}
-        </Card>{" "}
+              )}
+            </div>
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle>Personnel</CardTitle>
             <CardDescription>
-              Personnel assigned to {dept.name} ({dept.district}).
+              Personnel assigned to {dept.name}.
             </CardDescription>
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
-            {" "}
             <div className="mb-4">
               <Input
                 placeholder="Search personnel..."
                 value={memberSearchTerm}
                 onChange={(e) => setMemberSearchTerm(e.target.value)}
               />
-            </div>{" "}
+            </div>
             <div className="space-y-4">
-              {" "}
               {deptMembers.map((member) => (
                 <Card
                   key={member.id}
                   className="flex items-center justify-between p-4"
                 >
-                  {" "}
                   <div>
-                    {" "}
-                    <h4 className="font-semibold">{`${member.firstName} ${member.lastName}`}</h4>{" "}
-                    <p className="text-sm text-gray-600">{member.email}</p>{" "}
+                    <h4 className="font-semibold">{`${member.firstName} ${member.lastName}`}</h4>
+                    <p className="text-sm text-gray-600">{member.email}</p>
                     <Badge
                       variant={
                         member.role === "SUPERVISOR" ? "default" : "secondary"
@@ -824,52 +848,47 @@ export function SuperadminDashboard() {
                       className="mt-1 capitalize"
                     >
                       {member.role?.toLowerCase()}
-                    </Badge>{" "}
-                  </div>{" "}
+                    </Badge>
+                  </div>
                   <div className="flex items-center gap-2">
-                    {" "}
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => openEditPersonModal(member)}
                     >
                       <Edit className="h-4 w-4" />
-                    </Button>{" "}
+                    </Button>
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => confirmDeletePerson(member.id)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>{" "}
-                  </div>{" "}
+                    </Button>
+                  </div>
                 </Card>
-              ))}{" "}
+              ))}
               {deptMembers.length === 0 && (
                 <p className="text-center text-gray-500 py-4">
-                  No personnel found for this department type.
+                  No personnel found for this department.
                 </p>
-              )}{" "}
-            </div>{" "}
-          </CardContent>{" "}
-        </Card>{" "}
+              )}
+            </div>
+          </CardContent>
+        </Card>
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle>Assigned Cases</CardTitle>
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent>
-            {" "}
             {deptCases.length > 0 ? (
               deptCases.map((caseItem) => (
                 <Card
                   key={caseItem.id}
                   className="mb-2 p-4 flex justify-between items-center"
                 >
-                  {" "}
                   <div>
-                    {" "}
-                    <h4 className="font-semibold">{caseItem.title}</h4>{" "}
+                    <h4 className="font-semibold">{caseItem.title}</h4>
                     <p className="text-sm text-gray-500">
                       Status:{" "}
                       <Badge
@@ -883,140 +902,142 @@ export function SuperadminDashboard() {
                       >
                         {caseItem.status}
                       </Badge>
-                    </p>{" "}
-                  </div>{" "}
+                    </p>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={() => openIssueDetailsModal(caseItem)}
                   >
                     View Details
-                  </Button>{" "}
+                  </Button>
                 </Card>
               ))
             ) : (
               <p className="text-center text-gray-500 py-4">
                 No cases assigned.
               </p>
-            )}{" "}
-          </CardContent>{" "}
-        </Card>{" "}
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   };
   const renderIssuesList = (
     statusString: "active" | "pending" | "resolved"
   ) => {
-    const casesToDisplay = searchedCase
-      ? [searchedCase]
-      : cases.filter((c) => {
-          const caseStatus = c.status.toLowerCase();
-          let matches = false;
-          if (statusString === "active")
-            matches =
-              caseStatus.includes("investigating") ||
-              caseStatus.includes("reported");
-          else if (statusString === "resolved")
-            matches = caseStatus.includes("closed");
-          else if (statusString === "pending")
-            matches = !["investigating", "reported", "closed"].some((s) =>
-              caseStatus.includes(s)
-            );
-          return (
-            matches &&
-            (locationFilter === "all" || c.district === locationFilter) &&
-            c.complainantName
-              .toLowerCase()
-              .includes(issueSearchTerm.toLowerCase())
+    const casesToDisplay = (searchedCase ? [searchedCase] : cases).filter(
+      (c) => {
+        if (!c) return false;
+        const caseStatus = c.status.toLowerCase();
+        let matchesStatus = false;
+        if (statusString === "active") {
+          matchesStatus =
+            caseStatus.includes("investigating") ||
+            caseStatus.includes("reported");
+        } else if (statusString === "resolved") {
+          matchesStatus = caseStatus.includes("closed");
+        } else if (statusString === "pending") {
+          matchesStatus = !["investigating", "reported", "closed"].some((s) =>
+            caseStatus.includes(s)
           );
-        });
+        }
+
+        if (searchedCase) {
+          return matchesStatus;
+        }
+
+        return (
+          matchesStatus &&
+          (locationFilter === "all" ||
+            (c.district && c.district === locationFilter)) &&
+          c.complainantName &&
+          c.complainantName
+            .toLowerCase()
+            .includes(issueSearchTerm.toLowerCase())
+        );
+      }
+    );
+
     return (
       <div className="space-y-6">
-        {" "}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          {" "}
           <h2 className="text-3xl font-bold capitalize">
             {statusString} Issues
-          </h2>{" "}
+          </h2>
           <div className="flex items-center gap-2 w-full md:w-auto">
-            {" "}
             <Input
               className="w-full md:w-48"
               placeholder="Search by Complainant..."
               value={issueSearchTerm}
               onChange={(e) => setIssueSearchTerm(e.target.value)}
-            />{" "}
+            />
             <Select value={locationFilter} onValueChange={setLocationFilter}>
-              {" "}
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by District..." />
-              </SelectTrigger>{" "}
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Districts</SelectItem>
-                {[...new Set(cases.map((c) => c.district))].map((dist) => (
-                  <SelectItem key={dist} value={dist}>
-                    {dist}
-                  </SelectItem>
-                ))}
-              </SelectContent>{" "}
-            </Select>{" "}
+                {[...new Set(cases.map((c) => c.district))]
+                  .filter(Boolean)
+                  .map((dist) => (
+                    <SelectItem key={dist} value={dist}>
+                      {dist}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
             <Button onClick={() => setIsCreateCaseModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Create Case
-            </Button>{" "}
-          </div>{" "}
-        </div>{" "}
+            </Button>
+          </div>
+        </div>
         <Card>
-          {" "}
           <CardHeader>
             <CardTitle className="text-base">Find Case by ID</CardTitle>
-          </CardHeader>{" "}
+          </CardHeader>
           <CardContent className="flex items-center gap-2">
-            {" "}
             <Input
               placeholder="Enter full Case ID (UUID)..."
               value={caseIdSearch}
               onChange={(e) => setCaseIdSearch(e.target.value)}
-            />{" "}
+            />
             <Button onClick={handleCaseSearch}>
               <Search className="h-4 w-4 mr-2" /> Find
-            </Button>{" "}
+            </Button>
             {searchedCase && (
               <Button variant="outline" onClick={clearCaseSearch}>
                 Clear Search
               </Button>
-            )}{" "}
-          </CardContent>{" "}
-        </Card>{" "}
+            )}
+          </CardContent>
+        </Card>
         <div className="space-y-4">
-          {" "}
           {casesToDisplay.length > 0 ? (
             casesToDisplay.map((caseItem) => (
               <Card key={caseItem.id}>
-                {" "}
                 <CardContent className="p-4 flex items-center justify-between">
-                  {" "}
                   <div>
-                    {" "}
                     <h3 className="font-semibold">
                       Complainant: {caseItem.complainantName}
-                    </h3>{" "}
+                    </h3>
                     <div className="text-sm text-gray-600 mt-1">
                       <Badge variant="secondary">{caseItem.district}</Badge>
                       <Badge variant="outline" className="ml-2">
                         {caseItem.status}
                       </Badge>
-                    </div>{" "}
+                    </div>
                     <p className="text-sm text-gray-500 mt-1">
                       Reported:{" "}
                       {new Date(caseItem.reportedAt).toLocaleDateString()}
-                    </p>{" "}
-                  </div>{" "}
+                    </p>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={() => openIssueDetailsModal(caseItem)}
                   >
                     <Eye className="h-4 w-4 mr-2" /> View Details
-                  </Button>{" "}
-                </CardContent>{" "}
+                  </Button>
+                </CardContent>
               </Card>
             ))
           ) : (
@@ -1025,43 +1046,38 @@ export function SuperadminDashboard() {
                 No {statusString} issues found for the selected filters.
               </CardContent>
             </Card>
-          )}{" "}
-        </div>{" "}
+          )}
+        </div>
       </div>
     );
   };
   const Sidebar = (
     <nav className="p-4 bg-gray-50 h-full dark:bg-gray-900">
-      {" "}
       <div className="space-y-2">
-        {" "}
         <Button
           variant={activeTab === "overview" ? "secondary" : "ghost"}
           className="w-full justify-start gap-3"
           onClick={() => setActiveTab("overview")}
         >
           <Settings className="h-5 w-5" /> Overview
-        </Button>{" "}
+        </Button>
         <div className="pt-4">
-          {" "}
           <Button
             variant="ghost"
             className="w-full justify-between"
             onClick={toggleIssues}
           >
-            {" "}
             <div className="flex items-center gap-3 font-semibold">
               <AlertCircle className="h-5 w-5" /> Issues
-            </div>{" "}
+            </div>
             {expandedUi.issues ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
               <ChevronRight className="h-4 w-4" />
-            )}{" "}
-          </Button>{" "}
+            )}
+          </Button>
           {expandedUi.issues && (
             <div className="ml-6 mt-1 space-y-1">
-              {" "}
               {["active", "pending", "resolved"].map((status) => (
                 <Button
                   key={status}
@@ -1074,17 +1090,13 @@ export function SuperadminDashboard() {
                 >
                   {status.charAt(0).toUpperCase() + status.slice(1)}
                 </Button>
-              ))}{" "}
+              ))}
             </div>
-          )}{" "}
-        </div>{" "}
+          )}
+        </div>
         <div className="pt-4">
-          {" "}
           <div className="flex items-center justify-between mb-2 px-3">
-            {" "}
-            <h3 className="text-sm font-semibold text-gray-700">
-              Departments
-            </h3>{" "}
+            <h3 className="text-sm font-semibold text-gray-700">Departments</h3>
             <Button
               size="icon"
               variant="ghost"
@@ -1092,31 +1104,27 @@ export function SuperadminDashboard() {
               onClick={() => setIsDepartmentModalOpen(true)}
             >
               <Plus className="h-4 w-4" />
-            </Button>{" "}
-          </div>{" "}
+            </Button>
+          </div>
           <div className="space-y-1">
-            {" "}
             {departments.map((dept) => (
               <div key={dept.id}>
-                {" "}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start gap-2"
                   onClick={() => toggleDepartment(dept.id)}
                 >
-                  {" "}
                   {expandedUi.departments.has(dept.id) ? (
                     <ChevronDown className="h-3 w-3" />
                   ) : (
                     <ChevronRight className="h-3 w-3" />
-                  )}{" "}
-                  <Building className="h-4 w-4" />{" "}
-                  <span className="truncate">{dept.name}</span>{" "}
-                </Button>{" "}
+                  )}
+                  <Building className="h-4 w-4" />
+                  <span className="truncate">{dept.name}</span>
+                </Button>
                 {expandedUi.departments.has(dept.id) && (
                   <div className="ml-8 space-y-1 mt-1">
-                    {" "}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1127,7 +1135,7 @@ export function SuperadminDashboard() {
                       }}
                     >
                       <Eye className="h-3 w-3" /> View Details
-                    </Button>{" "}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1135,7 +1143,7 @@ export function SuperadminDashboard() {
                       onClick={() => openPersonModal("police", dept.id)}
                     >
                       <UserPlus className="h-3 w-3" /> Add Personnel
-                    </Button>{" "}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1143,7 +1151,7 @@ export function SuperadminDashboard() {
                       onClick={() => openPostModal(dept)}
                     >
                       <Briefcase className="h-3 w-3" /> Add Post
-                    </Button>{" "}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1151,18 +1159,16 @@ export function SuperadminDashboard() {
                       onClick={() => confirmDeleteDepartment(dept.id)}
                     >
                       <Trash2 className="h-3 w-3" /> Delete
-                    </Button>{" "}
+                    </Button>
                   </div>
-                )}{" "}
+                )}
               </div>
-            ))}{" "}
-          </div>{" "}
-        </div>{" "}
+            ))}
+          </div>
+        </div>
         <div className="pt-4">
-          {" "}
           <div className="flex items-center justify-between mb-2 px-3">
-            {" "}
-            <h3 className="text-sm font-semibold text-gray-700">Posts</h3>{" "}
+            <h3 className="text-sm font-semibold text-gray-700">Posts</h3>
             <Button
               size="icon"
               variant="ghost"
@@ -1170,15 +1176,17 @@ export function SuperadminDashboard() {
               onClick={() => openPostModal()}
             >
               <Plus className="h-4 w-4" />
-            </Button>{" "}
+            </Button>
           </div>
-        </div>{" "}
-      </div>{" "}
+        </div>
+      </div>
     </nav>
   );
 
   const renderContent = () => {
-    if (isLoading) return renderLoadingSkeletons();
+    if (isLoading) {
+      return renderLoadingSkeletons();
+    }
     switch (activeTab) {
       case "overview":
         return renderOverview();
@@ -1203,7 +1211,6 @@ export function SuperadminDashboard() {
         open={infoModal.isOpen}
         onOpenChange={() => setInfoModal((p) => ({ ...p, isOpen: false }))}
       >
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1223,7 +1230,7 @@ export function SuperadminDashboard() {
               OK
             </Button>
           </DialogFooter>
-        </DialogContent>{" "}
+        </DialogContent>
       </Dialog>
       <Dialog
         open={confirmationModal.isOpen}
@@ -1231,7 +1238,6 @@ export function SuperadminDashboard() {
           setConfirmationModal((p) => ({ ...p, isOpen: false }))
         }
       >
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{confirmationModal.title}</DialogTitle>
@@ -1256,19 +1262,17 @@ export function SuperadminDashboard() {
               Confirm
             </Button>
           </DialogFooter>
-        </DialogContent>{" "}
+        </DialogContent>
       </Dialog>
       <Dialog
         open={isDepartmentModalOpen}
         onOpenChange={setIsDepartmentModalOpen}
       >
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Department</DialogTitle>
-          </DialogHeader>{" "}
+          </DialogHeader>
           <form onSubmit={handleAddDepartment} className="space-y-4 py-4">
-            {" "}
             <div>
               <Label htmlFor="dept-name">Department Name</Label>
               <Input
@@ -1277,9 +1281,10 @@ export function SuperadminDashboard() {
                 onChange={(e) =>
                   setDepartmentForm((p) => ({ ...p, name: e.target.value }))
                 }
+                placeholder="e.g. Sadar Police Station"
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="dept-district">District</Label>
               <Select
@@ -1290,7 +1295,7 @@ export function SuperadminDashboard() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select district" />
+                  <SelectValue placeholder="Select a district" />
                 </SelectTrigger>
                 <SelectContent>
                   {TRIPURA_SUBDIVISIONS.map((district) => (
@@ -1300,7 +1305,7 @@ export function SuperadminDashboard() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>{" "}
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -1310,12 +1315,11 @@ export function SuperadminDashboard() {
                 Cancel
               </Button>
               <Button type="submit">Add Department</Button>
-            </DialogFooter>{" "}
-          </form>{" "}
-        </DialogContent>{" "}
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -1324,6 +1328,7 @@ export function SuperadminDashboard() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
+            {/* Person form fields remain unchanged */}
             <div>
               <Label htmlFor="person-fname">First Name</Label>
               <Input
@@ -1445,22 +1450,20 @@ export function SuperadminDashboard() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>{" "}
+        </DialogContent>
       </Dialog>
       <Dialog
         open={editPersonState.isOpen}
         onOpenChange={() => setEditPersonState({ isOpen: false, person: null })}
       >
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               Edit Personnel:{" "}
               {`${editPersonState.person?.firstName} ${editPersonState.person?.lastName}`}
             </DialogTitle>
-          </DialogHeader>{" "}
+          </DialogHeader>
           <form onSubmit={handleEditPerson} className="space-y-4 py-4">
-            {" "}
             <div>
               <Label htmlFor="edit-person-fname">First Name</Label>
               <Input
@@ -1474,7 +1477,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="edit-person-lname">Last Name</Label>
               <Input
@@ -1485,7 +1488,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="edit-person-email">Email</Label>
               <Input
@@ -1497,7 +1500,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="edit-person-role">Role</Label>
               <Select
@@ -1506,7 +1509,7 @@ export function SuperadminDashboard() {
                 onValueChange={(value) =>
                   setEditPersonForm((p) => ({
                     ...p,
-                    role: value as "MEMBER" | "SUPERVISOR",
+                    role: value as "MEMBER" | "SUPERVISOR" | "SUPERADMIN",
                   }))
                 }
               >
@@ -1516,9 +1519,10 @@ export function SuperadminDashboard() {
                 <SelectContent>
                   <SelectItem value="MEMBER">Personnel</SelectItem>
                   <SelectItem value="SUPERVISOR">Police Officer</SelectItem>
+                  <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
                 </SelectContent>
               </Select>
-            </div>{" "}
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -1530,21 +1534,19 @@ export function SuperadminDashboard() {
                 Cancel
               </Button>
               <Button type="submit">Save Changes</Button>
-            </DialogFooter>{" "}
-          </form>{" "}
-        </DialogContent>{" "}
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog
         open={isCreateCaseModalOpen}
         onOpenChange={setIsCreateCaseModalOpen}
       >
-        {" "}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Case</DialogTitle>
-          </DialogHeader>{" "}
+          </DialogHeader>
           <form onSubmit={handleCreateCase} className="space-y-4 py-4">
-            {" "}
             <div>
               <Label htmlFor="case-title">Case Title</Label>
               <Input
@@ -1555,7 +1557,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="case-desc">Description</Label>
               <Input
@@ -1566,7 +1568,7 @@ export function SuperadminDashboard() {
                 }
                 required
               />
-            </div>{" "}
+            </div>
             <div>
               <Label htmlFor="case-dept">Assign to Department</Label>
               <Select
@@ -1587,7 +1589,7 @@ export function SuperadminDashboard() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>{" "}
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -1597,59 +1599,55 @@ export function SuperadminDashboard() {
                 Cancel
               </Button>
               <Button type="submit">Create Case</Button>
-            </DialogFooter>{" "}
-          </form>{" "}
-        </DialogContent>{" "}
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog open={isPostModalOpen} onOpenChange={setIsPostModalOpen}>
-        {" "}
         <DialogContent>
-          {" "}
           <DialogHeader>
             <DialogTitle>Add New Post</DialogTitle>
-          </DialogHeader>{" "}
+            <DialogDescription>
+              Select a department to associate this post with. The system will
+              automatically assign the correct category.
+            </DialogDescription>
+          </DialogHeader>
           <form onSubmit={handleAddPost} className="space-y-4 py-4">
-            {" "}
             <div>
-              {" "}
-              <Label htmlFor="post-name">Post Name</Label>{" "}
+              <Label htmlFor="post-name">Post Name</Label>
               <Input
                 id="post-name"
                 value={postForm.postName}
                 onChange={(e) =>
                   setPostForm((p) => ({ ...p, postName: e.target.value }))
                 }
+                placeholder="e.g. Constable, Inspector"
                 required
-              />{" "}
-            </div>{" "}
+              />
+            </div>
             <div>
-              {" "}
-              <Label htmlFor="post-department">Department</Label>{" "}
+              <Label htmlFor="post-department">Department</Label>
               <Select
                 required
-                value={postForm.department}
+                value={postForm.departmentId}
                 onValueChange={(value) =>
-                  setPostForm((p) => ({
-                    ...p,
-                    department: value as "POLICE" | "DICE" | "ADMINISTRATION",
-                  }))
+                  setPostForm((p) => ({ ...p, departmentId: value }))
                 }
               >
-                {" "}
                 <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>{" "}
+                  <SelectValue placeholder="Select a department" />
+                </SelectTrigger>
                 <SelectContent>
-                  {" "}
-                  <SelectItem value="POLICE">Police</SelectItem>{" "}
-                  <SelectItem value="DICE">DISE</SelectItem>{" "}
-                  <SelectItem value="ADMINISTRATION">Administration</SelectItem>{" "}
-                </SelectContent>{" "}
-              </Select>{" "}
-            </div>{" "}
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
-              {" "}
-              <Label htmlFor="post-rank">Rank</Label>{" "}
+              <Label htmlFor="post-rank">Rank</Label>
               <Input
                 id="post-rank"
                 type="number"
@@ -1661,27 +1659,26 @@ export function SuperadminDashboard() {
                   }))
                 }
                 required
-              />{" "}
-            </div>{" "}
+                placeholder="A numeric value for hierarchy"
+              />
+            </div>
             <DialogFooter>
-              {" "}
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsPostModalOpen(false)}
               >
                 Cancel
-              </Button>{" "}
-              <Button type="submit">Add Post</Button>{" "}
-            </DialogFooter>{" "}
-          </form>{" "}
-        </DialogContent>{" "}
+              </Button>
+              <Button type="submit">Add Post</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog open={isIssueModalOpen} onOpenChange={setIsIssueModalOpen}>
-        {" "}
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{selectedCaseDetails?.complainantName}</DialogTitle>
+            <DialogTitle>{selectedCaseDetails?.title}</DialogTitle>
             <DialogDescription>
               Case ID: {selectedCaseDetails?.id} | Status:{" "}
               <Badge
@@ -1697,20 +1694,18 @@ export function SuperadminDashboard() {
                 {selectedCaseDetails?.status}
               </Badge>
             </DialogDescription>
-          </DialogHeader>{" "}
+          </DialogHeader>
           <div className="mt-4 space-y-6 max-h-[70vh] overflow-y-auto pr-4">
-            {" "}
             <div>
               <h3 className="font-semibold text-lg mb-2">Case Description</h3>
               <p className="text-gray-700">
                 {selectedCaseDetails?.description}
               </p>
-            </div>{" "}
+            </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">Investigating Team</h3>{" "}
+              <h3 className="font-semibold text-lg mb-2">Investigating Team</h3>
               {selectedCaseDetails?.teamFormation ? (
                 <div className="p-3 border rounded-md mb-2 bg-gray-50">
-                  {" "}
                   <h4 className="font-medium">
                     Team (Formed:{" "}
                     {selectedCaseDetails.teamFormation.formed_at
@@ -1719,44 +1714,42 @@ export function SuperadminDashboard() {
                         ).toLocaleDateString()
                       : "N/A"}
                     )
-                  </h4>{" "}
+                  </h4>
                   <p className="text-sm text-gray-500 mt-2">
                     Member IDs:{" "}
                     {selectedCaseDetails.teamFormation.member_ids.join(", ")}
-                  </p>{" "}
+                  </p>
                 </div>
               ) : (
                 <p className="text-gray-500">No team assigned.</p>
-              )}{" "}
-            </div>{" "}
+              )}
+            </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">Reports</h3>{" "}
+              <h3 className="font-semibold text-lg mb-2">Reports</h3>
               {selectedCaseDetails?.reports.length ?? 0 > 0 ? (
                 selectedCaseDetails?.reports.map((report) => (
                   <Card key={report.id} className="bg-gray-50 mb-2">
                     <CardHeader>
-                      {" "}
                       <CardTitle className="text-base">
                         Report by:{" "}
                         {personMap.get(report.personId)?.firstName || "Unknown"}
-                      </CardTitle>{" "}
-                    </CardHeader>{" "}
+                      </CardTitle>
+                    </CardHeader>
                     <CardContent>
-                      {" "}
-                      <p>{report.content}</p>{" "}
+                      <p>{report.content}</p>
                       <p className="text-xs text-gray-500 mt-2">
                         Submitted:{" "}
                         {new Date(report.submittedAt).toLocaleString()}
-                      </p>{" "}
-                    </CardContent>{" "}
+                      </p>
+                    </CardContent>
                   </Card>
                 ))
               ) : (
                 <p className="text-gray-500">No reports submitted.</p>
-              )}{" "}
-            </div>{" "}
-          </div>{" "}
-        </DialogContent>{" "}
+              )}
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
     </DashboardLayout>
   );
