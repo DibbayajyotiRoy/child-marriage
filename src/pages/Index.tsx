@@ -2,9 +2,11 @@ import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { SuperadminDashboard } from "@/components/Dashboards/SuperadminDashboard";
 import { PersonDashboard } from "@/components/Dashboards/PersonDashboard";
-import { OthersDashboard } from "@/components/Dashboards/OthersDashboard";
+import { SdmDashboard } from "@/components/Dashboards/SdmDashboard";
+import { DmDashboard } from "@/components/Dashboards/DmDashboard";
+import { SpDashboard } from "@/components/Dashboards/SpDashboard";
 import { LoginForm } from "@/components/Auth/LoginForm";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton for loading state
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
   const { user, isAuthenticated, loading } = useAuth();
@@ -22,18 +24,32 @@ const Index = () => {
     );
   }
 
+  // If the user is not authenticated, always show the login form
   if (!isAuthenticated) {
     return <LoginForm />;
   }
+
+  // Check the user's role and render the appropriate dashboard
   switch (user?.role) {
     case "SUPERADMIN":
       return <SuperadminDashboard />;
+
     case "MEMBER":
-    case "SUPERVISOR":
       return <PersonDashboard />;
-    // You can add more specific roles here if needed
+
+    // 4. Add routing for the new roles
+    case "SDM":
+      return <SdmDashboard />;
+
+    case "DM":
+      return <DmDashboard />;
+
+    case "SP":
+      return <SpDashboard />;
+
     default:
-      return <OthersDashboard />;
+      // This will handle any unexpected roles or logout the user
+      return <LoginForm />;
   }
 };
 

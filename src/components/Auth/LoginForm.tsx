@@ -30,13 +30,10 @@ export function LoginForm() {
     setError("");
 
     try {
-      // ✅ CRITICAL FIX: Pass a single object { email, password } to the login function.
-      // This will prevent the "JSON parse error" and the "Invalid salt" error.
       const success = await login({ email, password });
-
       if (success) {
-        // Redirect logic can be more sophisticated based on user role if needed
-        navigate("/"); // Redirect to the index page, which will then show the correct dashboard
+        // This is all you need. The Index component will handle the redirection.
+        navigate("/");
       }
     } catch (err) {
       console.error("Login submit error:", err);
@@ -57,6 +54,7 @@ export function LoginForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Form fields remain the same */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -72,7 +70,6 @@ export function LoginForm() {
                 />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -88,29 +85,34 @@ export function LoginForm() {
                 />
               </div>
             </div>
-
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
+          {/* Demo Accounts section is updated to include all roles */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <p className="text-sm font-medium text-gray-700 mb-2">
-              Demo Accounts:
+              Demo Accounts: (Password: "password")
             </p>
-            <div className="space-y-1 text-xs text-gray-600">
+            <div className="space-y-2 text-xs text-gray-600">
               <p>
                 <strong>Super Admin:</strong> admin@system.com
               </p>
               <p>
-                <strong>Password:</strong> password
+                <strong>SDM:</strong> sdm@system.com
+              </p>
+              <p>
+                <strong>DM:</strong> dm@system.com
+              </p>
+              <p>
+                <strong>SP:</strong> sp@system.com
               </p>
             </div>
           </div>

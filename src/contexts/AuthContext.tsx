@@ -1,4 +1,5 @@
 "use client";
+
 import React, {
   createContext,
   useContext,
@@ -10,10 +11,8 @@ import { authService, LoginRequest } from "@/api/services/auth.service";
 import { personService } from "@/api/services/person.service";
 import type { Person } from "@/types";
 
-// This interface is now valid because the base Person type was updated.
-export interface User extends Person {
-  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
-}
+// The User interface now directly extends the updated Person type
+export interface User extends Person {}
 
 interface AuthContextType {
   user: User | null;
@@ -47,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (credentials: LoginRequest): Promise<boolean> => {
+    // Super Admin login
     if (
       credentials.email === "admin@system.com" &&
       credentials.password === "password"
@@ -57,20 +57,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastName: "Admin",
         email: "admin@system.com",
         role: "SUPERADMIN",
+        address: "Agartala",
+        gender: "Other",
+        phoneNumber: "1111111111",
       };
       localStorage.setItem("user", JSON.stringify(superAdminUser));
       setUser(superAdminUser);
       return true;
     }
 
+    // SDM login
+    if (
+      credentials.email === "sdm@system.com" &&
+      credentials.password === "password"
+    ) {
+      const sdmUser: User = {
+        id: "00000000-0000-0000-0000-000000000002",
+        firstName: "SDM",
+        lastName: "User",
+        email: "sdm@system.com",
+        role: "SDM",
+        address: "Udaipur",
+        gender: "Other",
+        phoneNumber: "2222222222",
+      };
+      localStorage.setItem("user", JSON.stringify(sdmUser));
+      setUser(sdmUser);
+      return true;
+    }
+
+    // --- NEW: Add DM Login ---
+    if (
+      credentials.email === "dm@system.com" &&
+      credentials.password === "password"
+    ) {
+      const dmUser: User = {
+        id: "00000000-0000-0000-0000-000000000003",
+        firstName: "DM",
+        lastName: "User",
+        email: "dm@system.com",
+        role: "DM",
+        address: "Dharmanagar",
+        gender: "Other",
+        phoneNumber: "3333333333",
+      };
+      localStorage.setItem("user", JSON.stringify(dmUser));
+      setUser(dmUser);
+      return true;
+    }
+
+    // --- NEW: Add SP Login ---
+    if (
+      credentials.email === "sp@system.com" &&
+      credentials.password === "password"
+    ) {
+      const spUser: User = {
+        id: "00000000-0000-0000-0000-000000000004",
+        firstName: "SP",
+        lastName: "User",
+        email: "sp@system.com",
+        role: "SP",
+        address: "Sadar",
+        gender: "Other",
+        phoneNumber: "4444444444",
+      };
+      localStorage.setItem("user", JSON.stringify(spUser));
+      setUser(spUser);
+      return true;
+    }
+
+    // Fallback to real API login for other users
     try {
       const response = await authService.login(credentials);
       if (response && response.userId) {
-        const userProfile = await personService.getById(response.userId);
-        const userData: User = {
-          ...userProfile,
-          role: userProfile.role || "MEMBER",
-        };
+        const userData = (await personService.getById(response.userId)) as User;
         localStorage.setItem("user", JSON.stringify(userData));
         setUser(userData);
         return true;
@@ -88,7 +148,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
-    window.location.href = "/"; // Go back to the index page on logout
+    window.location.href = "/";
   };
 
   return (

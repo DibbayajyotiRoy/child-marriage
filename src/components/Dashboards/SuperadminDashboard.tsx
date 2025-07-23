@@ -83,7 +83,7 @@ interface EnrichedCase extends BaseCase {
   description: string;
   departmentId: string;
   complainantName: string;
-  district: string;
+  subdivision: string;
   status: string;
   reportedAt: string;
 }
@@ -151,10 +151,12 @@ const INITIAL_PERSON_FORM_STATE = {
   address: "",
   gender: "Male",
   phoneNumber: "",
+  subdivision: "",
+  designation: "",
+  rank: 0,
 };
 const INITIAL_DEPARTMENT_FORM_STATE: CreateDepartmentRequest = {
   name: "",
-  district: "",
 };
 const INITIAL_CASE_FORM_STATE = {
   title: "",
@@ -332,7 +334,7 @@ export function SuperadminDashboard() {
 
   const handleAddDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentForm.name || !departmentForm.district) return;
+    if (!departmentForm.name) return;
     try {
       await departmentService.create(departmentForm);
       await fetchData(true);
@@ -449,15 +451,33 @@ export function SuperadminDashboard() {
 
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // --- Form Validation ---
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      departmentId,
+      subdivision,
+      gender,
+      phoneNumber,
+      address,
+      designation,
+      rank,
+    } = personForm;
+
     if (
-      !personForm.firstName ||
-      !personForm.lastName ||
-      !personForm.email ||
-      !personForm.password ||
-      !personForm.departmentId ||
-      !personForm.address ||
-      !personForm.gender ||
-      !personForm.phoneNumber
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !departmentId ||
+      !subdivision ||
+      !gender ||
+      !phoneNumber ||
+      !address ||
+      !designation
     ) {
       setInfoModal({
         isOpen: true,
@@ -467,20 +487,51 @@ export function SuperadminDashboard() {
       });
       return;
     }
-    const roleForBackend =
-      personModalType === "police" ? "SUPERVISOR" : "MEMBER";
-    try {
-      await personService.create({
-        firstName: personForm.firstName,
-        lastName: personForm.lastName,
-        email: personForm.email,
-        password: personForm.password,
-        departmentId: personForm.departmentId,
-        role: roleForBackend,
-        address: personForm.address,
-        gender: personForm.gender,
-        phoneNumber: personForm.phoneNumber,
+
+    // --- Derive Payload Fields ---
+    const selectedDept = departments.find((d) => d.id === departmentId);
+    if (!selectedDept) {
+      setInfoModal({
+        isOpen: true,
+        title: "Error",
+        message: "Selected department not found.",
+        isError: true,
       });
+      return;
+    }
+
+    const departmentCategory = getDeptCategory(selectedDept.name);
+    if (!departmentCategory) {
+      setInfoModal({
+        isOpen: true,
+        title: "Unrecognized Department Type",
+        message: `Could not determine the category for "${selectedDept.name}".`,
+        isError: true,
+      });
+      return;
+    }
+
+    // --- Construct Final Payload ---
+    const payload = {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      gender,
+      address,
+      role: personModalType === "police" ? "SUPERVISOR" : "MEMBER",
+      department: departmentCategory,
+      password,
+      subdivision,
+      designation,
+      officeName: selectedDept.name,
+      status: "ACTIVE",
+      subdivision: subdivision, // Using subdivision for subdivision
+      rank,
+    };
+
+    try {
+      await personService.create(payload);
       await fetchData(true);
       setIsPersonModalOpen(false);
       setPersonForm(INITIAL_PERSON_FORM_STATE);
@@ -949,7 +1000,7 @@ export function SuperadminDashboard() {
         return (
           matchesStatus &&
           (locationFilter === "all" ||
-            (c.district && c.district === locationFilter)) &&
+            (c.subdivision && c.subdivision === locationFilter)) &&
           c.complainantName &&
           c.complainantName
             .toLowerCase()
@@ -973,11 +1024,11 @@ export function SuperadminDashboard() {
             />
             <Select value={locationFilter} onValueChange={setLocationFilter}>
               <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter by District..." />
+                <SelectValue placeholder="Filter by Sub-Division..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Districts</SelectItem>
-                {[...new Set(cases.map((c) => c.district))]
+                <SelectItem value="all">All Sub-Divisions</SelectItem>
+                {[...new Set(cases.map((c) => c.subdivision))]
                   .filter(Boolean)
                   .map((dist) => (
                     <SelectItem key={dist} value={dist}>
@@ -1021,7 +1072,7 @@ export function SuperadminDashboard() {
                       Complainant: {caseItem.complainantName}
                     </h3>
                     <div className="text-sm text-gray-600 mt-1">
-                      <Badge variant="secondary">{caseItem.district}</Badge>
+                      <Badge variant="secondary">{caseItem.subdivision}</Badge>
                       <Badge variant="outline" className="ml-2">
                         {caseItem.status}
                       </Badge>
@@ -1285,27 +1336,6 @@ export function SuperadminDashboard() {
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="dept-district">District</Label>
-              <Select
-                required
-                value={departmentForm.district}
-                onValueChange={(value) =>
-                  setDepartmentForm((p) => ({ ...p, district: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a district" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRIPURA_SUBDIVISIONS.map((district) => (
-                    <SelectItem key={district} value={district}>
-                      {district}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -1320,7 +1350,7 @@ export function SuperadminDashboard() {
         </DialogContent>
       </Dialog>
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Add New{" "}
@@ -1328,28 +1358,29 @@ export function SuperadminDashboard() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
-            {/* Person form fields remain unchanged */}
-            <div>
-              <Label htmlFor="person-fname">First Name</Label>
-              <Input
-                id="person-fname"
-                value={personForm.firstName}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, firstName: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-lname">Last Name</Label>
-              <Input
-                id="person-lname"
-                value={personForm.lastName}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, lastName: e.target.value }))
-                }
-                required
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="person-fname">First Name</Label>
+                <Input
+                  id="person-fname"
+                  value={personForm.firstName}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({ ...p, firstName: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="person-lname">Last Name</Label>
+                <Input
+                  id="person-lname"
+                  value={personForm.lastName}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({ ...p, lastName: e.target.value }))
+                  }
+                  required
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="person-email">Email</Label>
@@ -1406,6 +1437,34 @@ export function SuperadminDashboard() {
               </Select>
             </div>
             <div>
+              <Label htmlFor="person-designation">Designation</Label>
+              <Input
+                id="person-designation"
+                value={personForm.designation}
+                onChange={(e) =>
+                  setPersonForm((p) => ({ ...p, designation: e.target.value }))
+                }
+                placeholder="e.g., Officer In-charge"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="person-rank">Rank</Label>
+              <Input
+                id="person-rank"
+                type="number"
+                value={personForm.rank}
+                onChange={(e) =>
+                  setPersonForm((p) => ({
+                    ...p,
+                    rank: parseInt(e.target.value, 10) || 0,
+                  }))
+                }
+                placeholder="e.g., 5"
+                required
+              />
+            </div>
+            <div>
               <Label htmlFor="person-address">Address</Label>
               <Textarea
                 id="person-address"
@@ -1417,7 +1476,28 @@ export function SuperadminDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-dept">Department</Label>
+              <Label htmlFor="person-subdivision">Sub-Division</Label>
+              <Select
+                required
+                value={personForm.subdivision}
+                onValueChange={(value) =>
+                  setPersonForm((p) => ({ ...p, subdivision: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a subdivision" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRIPURA_SUBDIVISIONS.map((subdivision) => (
+                    <SelectItem key={subdivision} value={subdivision}>
+                      {subdivision}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="person-dept">Department (Office)</Label>
               <Select
                 required
                 value={personForm.departmentId}

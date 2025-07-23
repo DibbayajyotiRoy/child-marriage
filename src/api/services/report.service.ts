@@ -2,7 +2,6 @@ import { BaseApiService } from '../base';
 import { endpoints } from '../endpoints';
 import { Report } from '@/types';
 
-// ✅ FIXED: caseId is now correctly a string (UUID)
 export interface CreateReportRequest {
   caseId: string; 
   personId: string; 

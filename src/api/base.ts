@@ -30,7 +30,6 @@ export class BaseApiService {
   ): Promise<T> {
     const token = localStorage.getItem('authToken');
 
-    // --- Enhanced Logging: Check if the token exists ---
     if (!token) {
       console.warn(`[BaseApiService] No auth token found in localStorage for request to ${url}`);
     }
@@ -44,7 +43,6 @@ export class BaseApiService {
       ...options,
     };
 
-    // --- Enhanced Logging: Log the final request config ---
     console.log(`[BaseApiService] Making ${config.method || 'GET'} request to ${url}`, {
         headers: config.headers,
     });
@@ -54,8 +52,7 @@ export class BaseApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        // --- Enhanced Logging: Attempt to get more error details ---
-        const errorData = await response.json().catch(() => ({})); // Gracefully handle non-JSON error responses
+        const errorData = await response.json().catch(() => ({})); 
         console.error(`[BaseApiService] API Error on ${url}:`, {
             status: response.status,
             statusText: response.statusText,
@@ -69,10 +66,19 @@ export class BaseApiService {
         );
       }
 
-      // On success, parse the JSON response
+      // --- START: THE FIX ---
+      // Check for 204 No Content status. If so, the request was successful
+      // but there is no body to parse. Return null to signify this.
+      if (response.status === 204) {
+        return null as unknown as T;
+      }
+      // --- END: THE FIX ---
+
+      // If the response was successful and was NOT a 204, it has a body.
+      // Now it's safe to parse the JSON.
       return await response.json();
+      
     } catch (error) {
-      // Re-throw known API errors or create a generic one for network issues
       if (error instanceof ApiError) {
         throw error;
       }
