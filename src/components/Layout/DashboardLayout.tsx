@@ -34,7 +34,7 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">CM</span>
+              <span className="text-primary-foreground font-bold text-sm">NIC</span>
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               {title}

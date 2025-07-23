@@ -1,6 +1,6 @@
 // src/types.ts
 
-// ✅ FIXED: This interface now matches the detailed JSON structure from your API
+
 export interface Case {
   id: string; 
   complainantName: string;
@@ -18,7 +18,6 @@ export interface Case {
   caseDetails: CaseDetail[];
 }
 
-// ✅ ADDED: A new type for the nested caseDetails object
 export interface CaseDetail {
     id: string;
     caseId: string;
@@ -74,10 +73,13 @@ export interface Person {
   firstName: string;
   lastName: string;
   email: string;
-  department?: string;
   departmentId?: string;
-  role?: 'MEMBER' | 'SUPERVISOR' | 'SUPERADMIN'; 
+  role: "MEMBER" | "SUPERADMIN" | "SDM" | "DM" | "SP";
+  address: string;
+  gender: string;
+  phoneNumber: string;
 }
+
 
 export interface Department {
   id: string;
