@@ -43,15 +43,18 @@ import {
   AlertCircle,
   UserPlus,
   Eye,
-  CheckCircle,
   FileText,
   Send,
   MapPin,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "../ui/sonner";
 
 // --- API Service Imports ---
-import { personService } from "@/api/services/person.service";
+import {
+  personService,
+  type CreatePersonRequest,
+} from "@/api/services/person.service";
 import { caseService } from "@/api/services/case.service";
 import { departmentService } from "@/api/services/department.service";
 import { reportService } from "@/api/services/report.service";
@@ -59,12 +62,32 @@ import { reportService } from "@/api/services/report.service";
 // --- Import central types ---
 import type { Person, Case, Report, Department } from "@/types";
 
-interface InfoModalState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  isError?: boolean;
-}
+// --- DATA MAPPERS ---
+const mapApiCaseToStateCase = (apiCase: any): Case => {
+  const details = apiCase.caseDetails?.[0];
+  return {
+    ...apiCase,
+    complainantName: details?.girlName || "Unknown Complainant",
+    description: `Case involving ${details?.girlName || "N/A"} at ${
+      details?.marriageAddress || "N/A"
+    }.`,
+    district: details?.girlSubdivision || "Unknown District",
+    caseAddress: details?.girlAddress || "No address provided",
+  };
+};
+
+const mapApiPersonToStatePerson = (
+  apiPerson: any,
+  departments: Department[]
+): Person => {
+  const dept = departments.find(
+    (d) => d.name.toLowerCase() === apiPerson.department?.toLowerCase()
+  );
+  return {
+    ...apiPerson,
+    departmentId: dept ? dept.id : undefined,
+  };
+};
 
 const TRIPURA_SUBDIVISIONS = [
   "Sadar",
@@ -91,9 +114,7 @@ const TRIPURA_SUBDIVISIONS = [
   "Kumarghat",
 ];
 
-const INITIAL_PERSON_FORM_STATE: Omit<Person, "id" | "role"> & {
-  password: string;
-} = {
+const INITIAL_PERSON_FORM_STATE: Omit<CreatePersonRequest, "role"> = {
   firstName: "",
   lastName: "",
   email: "",
@@ -101,7 +122,7 @@ const INITIAL_PERSON_FORM_STATE: Omit<Person, "id" | "role"> & {
   address: "",
   gender: "Male",
   phoneNumber: "",
-  departmentId: undefined,
+  departmentId: "",
 };
 
 export function DmDashboard() {
@@ -114,27 +135,16 @@ export function DmDashboard() {
     Record<number, string>
   >({});
   const [isLoading, setIsLoading] = useState(true);
-
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [isPersonDetailModalOpen, setIsPersonDetailModalOpen] = useState(false);
   const [isIssueDrawerOpen, setIsIssueDrawerOpen] = useState(false);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
-
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-
-  const [infoModal, setInfoModal] = useState<InfoModalState>({
-    isOpen: false,
-    title: "",
-    message: "",
-  });
   const [personForm, setPersonForm] = useState(INITIAL_PERSON_FORM_STATE);
-
-  // --- Search and Filter States ---
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
-  // NEW: State for the location filter on the personnel page
   const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const fetchData = useCallback(async (refresh = false) => {
@@ -145,16 +155,20 @@ export function DmDashboard() {
         caseService.getAll().catch(() => []),
         departmentService.getAll().catch(() => []),
       ]);
-      setPersons(personData as Person[]);
-      setCases(caseData as Case[]);
-      setDepartments(departmentData as Department[]);
+
+      const fetchedDepartments = departmentData as Department[];
+      const mappedPersons = personData.map((p) =>
+        mapApiPersonToStatePerson(p, fetchedDepartments)
+      );
+      const mappedCases = caseData.map(mapApiCaseToStateCase);
+
+      setPersons(mappedPersons);
+      setCases(mappedCases);
+      setDepartments(fetchedDepartments);
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Connection Error",
-        message: "Failed to connect to the server.",
-        isError: true,
+      toast.error("Connection Error", {
+        description: "Failed to connect to the server.",
       });
     } finally {
       setIsLoading(false);
@@ -170,18 +184,17 @@ export function DmDashboard() {
     [persons]
   );
 
-  // UPDATE: The filtering logic for personnel now includes the new locationFilter
   const filteredPersons = useMemo(
     () =>
       persons.filter(
         (p) =>
           (departmentFilter === "all" || p.departmentId === departmentFilter) &&
-          (locationFilter === "all" || p.address === locationFilter) && // New filter condition
+          (locationFilter === "all" || p.address === locationFilter) &&
           `${p.firstName} ${p.lastName}`
             .toLowerCase()
             .includes(personSearchTerm.toLowerCase())
       ),
-    [persons, personSearchTerm, departmentFilter, locationFilter] // Add new filter to dependency array
+    [persons, personSearchTerm, departmentFilter, locationFilter]
   );
 
   const filteredCases = useMemo(
@@ -198,7 +211,30 @@ export function DmDashboard() {
   );
 
   const handleAddPerson = async (e: React.FormEvent) => {
-    // This function remains the same as in SdmDashboard
+    e.preventDefault();
+    if (
+      !personForm.email ||
+      !personForm.password ||
+      !personForm.address ||
+      !personForm.departmentId
+    ) {
+      toast.error("Validation Error", {
+        description: "Please fill all required fields.",
+      });
+      return;
+    }
+    try {
+      await personService.create({ ...personForm, role: "MEMBER" });
+      await fetchData(true);
+      setIsPersonModalOpen(false);
+      setPersonForm(INITIAL_PERSON_FORM_STATE);
+      toast.success("Success", {
+        description: "New person added successfully.",
+      });
+    } catch (err) {
+      console.error("Failed to add person:", err);
+      toast.error("Error", { description: "Failed to add person." });
+    }
   };
 
   const openIssueDrawer = (caseItem: Case) => {
@@ -212,7 +248,45 @@ export function DmDashboard() {
   };
 
   const handleViewReports = async () => {
-    // This function remains the same as in SdmDashboard
+    if (!selectedCase) return;
+    try {
+      const reports = await reportService.getByCaseId(selectedCase.id);
+      setCaseReports(reports);
+      setReportFeedbacks({});
+      setIsReportsModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch reports:", err);
+      toast.error("Error", {
+        description: "Could not fetch reports for this case.",
+      });
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    const feedbackPromises = Object.entries(reportFeedbacks)
+      .filter(([, feedbackText]) => feedbackText.trim() !== "")
+      .map(([reportIdStr, sdmFeedback]) => {
+        const reportId = parseInt(reportIdStr, 10);
+        return reportService.update(reportId, { sdmFeedback });
+      });
+
+    if (feedbackPromises.length === 0) {
+      toast.info("No Feedback", {
+        description: "Please write feedback before submitting.",
+      });
+      return;
+    }
+
+    try {
+      await Promise.all(feedbackPromises);
+      toast.success("Success!", {
+        description: "All feedback has been submitted.",
+      });
+      setIsReportsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+      toast.error("Submission Failed", { description: "An error occurred." });
+    }
   };
 
   const Sidebar = (
@@ -270,7 +344,6 @@ export function DmDashboard() {
               ))}
             </SelectContent>
           </Select>
-          {/* NEW: Location Filter Dropdown */}
           <Select value={locationFilter} onValueChange={setLocationFilter}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by Location" />
@@ -317,7 +390,6 @@ export function DmDashboard() {
   );
 
   const renderIssues = () => (
-    // This function's content is identical to SdmDashboard
     <Card>
       <CardHeader>
         <CardTitle>Issue Viewer</CardTitle>
@@ -367,19 +439,53 @@ export function DmDashboard() {
     <DashboardLayout title="DM Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
 
-      {/* --- All Modals and Drawers are identical to SdmDashboard --- */}
-      {/* They are included here for completeness */}
-
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
-        <DialogContent>{/* Add Person Form Here */}</DialogContent>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Person</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddPerson} className="space-y-4 py-4">
+            {/* Form fields... */}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPersonModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Add Person</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog
         open={isPersonDetailModalOpen}
         onOpenChange={setIsPersonDetailModalOpen}
       >
-        <DialogContent>{/* Person Details Here */}</DialogContent>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Personnel Details</DialogTitle>
+          </DialogHeader>
+          {selectedPerson && (
+            <div className="space-y-2">
+              <p>
+                <strong>Name:</strong> {selectedPerson.firstName}{" "}
+                {selectedPerson.lastName}
+              </p>
+              <p>
+                <strong>Email:</strong> {selectedPerson.email}
+              </p>
+              <p>
+                <strong>Department:</strong>{" "}
+                {departments.find((d) => d.id === selectedPerson.departmentId)
+                  ?.name || "N/A"}
+              </p>
+              {/* ... other details */}
+            </div>
+          )}
+        </DialogContent>
       </Dialog>
-
       <Drawer
         direction="right"
         open={isIssueDrawerOpen}
@@ -391,50 +497,33 @@ export function DmDashboard() {
             <DrawerDescription>ID: {selectedCase?.id}</DrawerDescription>
           </DrawerHeader>
           <div className="flex-grow p-4 overflow-y-auto space-y-4">
-            {/* Redesigned Drawer Content Here */}
+            {/* Case details... */}
           </div>
           <DrawerFooter className="border-t flex-row justify-between">
             <DrawerClose asChild>
               <Button variant="outline">Close</Button>
             </DrawerClose>
-            <div className="space-x-2">
-              <Button onClick={handleViewReports}>
-                <FileText className="h-4 w-4 mr-2" />
-                View Reports
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => alert("Final Report logic goes here.")}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Generate Final Report
-              </Button>
-            </div>
+            <Button onClick={handleViewReports}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Reports
+            </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
-      <Dialog
-        open={isReportsModalOpen}
-        onOpenChange={setIsReportsModalOpen}
-        modal={false}
-      >
-        <DialogContent
-          onPointerDownOutside={(e) => {
-            e.stopPropagation();
-          }}
-          className="max-w-4xl h-[80vh] flex flex-col"
-        >
+      <Dialog open={isReportsModalOpen} onOpenChange={setIsReportsModalOpen}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Team Reports for Case #{selectedCase?.id.substring(0, 8)}
             </DialogTitle>
             <DialogDescription>
-              Review reports submitted by the team and provide feedback.
+              Review reports and provide feedback.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow overflow-y-auto pr-4 space-y-4">
-            {/* Reports Content Here */}
+            {caseReports.map((report) => (
+              <Card key={report.id}>{/* Report content... */}</Card>
+            ))}
           </div>
           <DialogFooter>
             <Button
@@ -443,11 +532,7 @@ export function DmDashboard() {
             >
               Close
             </Button>
-            <Button
-              onClick={() => alert("Feedback submission logic goes here.")}
-            >
-              Submit All Feedback
-            </Button>
+            <Button onClick={handleFeedbackSubmit}>Submit All Feedback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

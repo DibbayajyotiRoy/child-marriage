@@ -61,14 +61,33 @@ import { reportService } from "@/api/services/report.service";
 // --- Import central types ---
 import type { Person, Case, Report, Department } from "@/types";
 
-interface InfoModalState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  isError?: boolean;
-}
+// --- DATA MAPPERS ---
+const mapApiCaseToStateCase = (apiCase: any): Case => {
+  const details = apiCase.caseDetails?.[0];
+  return {
+    ...apiCase,
+    complainantName: details?.girlName || "Unknown Complainant",
+    description: `Case involving ${details?.girlName || "N/A"} at ${
+      details?.marriageAddress || "N/A"
+    }.`,
+    district: details?.girlSubdivision || "Unknown District",
+    caseAddress: details?.girlAddress || "No address provided",
+  };
+};
 
-// --- Constants ---
+const mapApiPersonToStatePerson = (
+  apiPerson: any,
+  departments: Department[]
+): Person => {
+  const dept = departments.find(
+    (d) => d.name.toLowerCase() === apiPerson.department?.toLowerCase()
+  );
+  return {
+    ...apiPerson,
+    departmentId: dept ? dept.id : undefined,
+  };
+};
+
 const TRIPURA_SUBDIVISIONS = [
   "Sadar",
   "Mohanpur",
@@ -121,11 +140,6 @@ export function SdmDashboard() {
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-  const [infoModal, setInfoModal] = useState<InfoModalState>({
-    isOpen: false,
-    title: "",
-    message: "",
-  });
   const [personForm, setPersonForm] = useState(INITIAL_PERSON_FORM_STATE);
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
@@ -140,33 +154,15 @@ export function SdmDashboard() {
         departmentService.getAll().catch(() => []),
       ]);
 
-      const departments = departmentData as Department[];
-      const departmentMapByName = new Map(
-        departments.map((d) => [d.name.toLowerCase(), d.id])
+      const fetchedDepartments = departmentData as Department[];
+      const mappedPersons = personData.map((p) =>
+        mapApiPersonToStatePerson(p, fetchedDepartments)
       );
-
-      // MAPPER FUNCTION FOR PERSONS
-      const mappedPersons = (personData as Person[]).map((p) => ({
-        ...p,
-        departmentId:
-          departmentMapByName.get(p.officeName?.toLowerCase()) || undefined,
-      }));
-
-      // MAPPER FUNCTION FOR CASES
-      const mappedCases = (caseData as Case[]).map((c) => {
-        const details = c.caseDetails?.[0];
-        return {
-          ...c,
-          complainantName: details?.girlName || "N/A",
-          description: `Case involving ${details?.girlName} and ${details?.boyName}.`,
-          district: details?.girlAddress?.split(",")[1]?.trim() || "Unknown",
-          caseAddress: details?.girlAddress || "Unknown",
-        };
-      });
+      const mappedCases = caseData.map(mapApiCaseToStateCase);
 
       setPersons(mappedPersons);
       setCases(mappedCases);
-      setDepartments(departments);
+      setDepartments(fetchedDepartments);
     } catch (err) {
       console.error("Failed to fetch data:", err);
       toast.error("Connection Error", {
@@ -220,7 +216,7 @@ export function SdmDashboard() {
       !personForm.departmentId
     ) {
       toast.error("Validation Error", {
-        description: "Please fill all required fields.",
+        description: "Please fill all required fields, including department.",
       });
       return;
     }
@@ -234,7 +230,7 @@ export function SdmDashboard() {
       });
     } catch (err) {
       console.error("Failed to add person:", err);
-      toast.error("Error", { description: "Failed to add new person." });
+      toast.error("Error", { description: "Failed to add person." });
     }
   };
 
@@ -253,6 +249,7 @@ export function SdmDashboard() {
     try {
       const reports = await reportService.getByCaseId(selectedCase.id);
       setCaseReports(reports);
+      setReportFeedbacks({}); // Clear previous feedbacks
       setIsReportsModalOpen(true);
     } catch (err) {
       console.error("Failed to fetch reports:", err);
@@ -285,9 +282,7 @@ export function SdmDashboard() {
       setIsReportsModalOpen(false);
     } catch (error) {
       console.error("Failed to submit feedback:", error);
-      toast.error("Submission Failed", {
-        description: "An error occurred while submitting feedback.",
-      });
+      toast.error("Submission Failed", { description: "An error occurred." });
     }
   };
 
@@ -423,7 +418,6 @@ export function SdmDashboard() {
     <DashboardLayout title="SDM Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
 
-      {/* Add Person Modal */}
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -431,9 +425,9 @@ export function SdmDashboard() {
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
             <div>
-              <Label htmlFor="person-fname">First Name</Label>
+              <Label htmlFor="sdm-person-fname">First Name</Label>
               <Input
-                id="person-fname"
+                id="sdm-person-fname"
                 value={personForm.firstName}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, firstName: e.target.value }))
@@ -442,9 +436,9 @@ export function SdmDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-lname">Last Name</Label>
+              <Label htmlFor="sdm-person-lname">Last Name</Label>
               <Input
-                id="person-lname"
+                id="sdm-person-lname"
                 value={personForm.lastName}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, lastName: e.target.value }))
@@ -453,9 +447,9 @@ export function SdmDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-email">Email</Label>
+              <Label htmlFor="sdm-person-email">Email</Label>
               <Input
-                id="person-email"
+                id="sdm-person-email"
                 type="email"
                 value={personForm.email}
                 onChange={(e) =>
@@ -465,9 +459,9 @@ export function SdmDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-password">Temporary Password</Label>
+              <Label htmlFor="sdm-person-password">Temporary Password</Label>
               <Input
-                id="person-password"
+                id="sdm-person-password"
                 type="password"
                 value={personForm.password}
                 onChange={(e) =>
@@ -477,9 +471,9 @@ export function SdmDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-phone">Phone Number</Label>
+              <Label htmlFor="sdm-person-phone">Phone Number</Label>
               <Input
-                id="person-phone"
+                id="sdm-person-phone"
                 value={personForm.phoneNumber}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, phoneNumber: e.target.value }))
@@ -488,7 +482,7 @@ export function SdmDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-gender">Gender</Label>
+              <Label htmlFor="sdm-person-gender">Gender</Label>
               <Select
                 required
                 value={personForm.gender}
@@ -507,7 +501,7 @@ export function SdmDashboard() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="person-address">Address (Subdivision)</Label>
+              <Label htmlFor="sdm-person-address">Address (Subdivision)</Label>
               <Select
                 required
                 value={personForm.address}
@@ -528,7 +522,7 @@ export function SdmDashboard() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="person-department">Department</Label>
+              <Label htmlFor="sdm-person-department">Department</Label>
               <Select
                 required
                 value={personForm.departmentId}
@@ -565,7 +559,6 @@ export function SdmDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Other Modals & Drawers remain the same */}
       <Dialog
         open={isPersonDetailModalOpen}
         onOpenChange={setIsPersonDetailModalOpen}
@@ -587,9 +580,6 @@ export function SdmDashboard() {
                 <strong>Phone:</strong> {selectedPerson.phoneNumber}
               </p>
               <p>
-                <strong>Gender:</strong> {selectedPerson.gender}
-              </p>
-              <p>
                 <strong>Address:</strong> {selectedPerson.address}
               </p>
               <p>
@@ -604,64 +594,133 @@ export function SdmDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
       <Drawer
         direction="left"
         open={isIssueDrawerOpen}
         onOpenChange={setIsIssueDrawerOpen}
       >
         <DrawerContent className="w-1/2 mt-0 h-screen">
-          <DrawerHeader className="text-left">
-            <DrawerTitle>Case Details</DrawerTitle>
+          <DrawerHeader className="text-left border-b">
+            <DrawerTitle>
+              Case Details: {selectedCase?.complainantName}
+            </DrawerTitle>
             <DrawerDescription>ID: {selectedCase?.id}</DrawerDescription>
           </DrawerHeader>
-          <div className="p-4 space-y-4">
-            {selectedCase && (
+          <div className="flex-grow p-4 overflow-y-auto space-y-4">
+            {selectedCase && selectedCase.caseDetails?.[0] && (
               <>
-                <p>
-                  <strong>Complainant:</strong> {selectedCase.complainantName}
-                </p>
-                <p>
-                  <strong>Status:</strong> <Badge>{selectedCase.status}</Badge>
-                </p>
-                <p>
-                  <strong>Description:</strong> {selectedCase.description}
-                </p>
-                {selectedCase.caseDetails?.[0] && (
-                  <div className="border-t pt-4 mt-4">
-                    <h4 className="font-bold">Girl's Details</h4>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Case Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
                     <p>
-                      {selectedCase.caseDetails[0].girlName} (Age:{" "}
-                      {selectedCase.caseDetails[0].girlAge})
+                      <strong>Status:</strong>{" "}
+                      <Badge>{selectedCase.status}</Badge>
                     </p>
                     <p>
-                      Address: {selectedCase.caseDetails[0].girlAddress},{" "}
+                      <strong>Description:</strong> {selectedCase.description}
+                    </p>
+                    <p>
+                      <strong>Reported At:</strong>{" "}
+                      {new Date(selectedCase.reportedAt).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Girl's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlName}
+                    </p>
+                    <p>
+                      <strong>Father's Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlFatherName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlAddress}
+                    </p>
+                    <p>
+                      <strong>Subdivision:</strong>{" "}
                       {selectedCase.caseDetails[0].girlSubdivision}
                     </p>
-                  </div>
-                )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Boy's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyName}
+                    </p>
+                    <p>
+                      <strong>Father's Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyFatherName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyAddress}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Marriage & Team Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Marriage Date:</strong>{" "}
+                      {new Date(
+                        selectedCase.caseDetails[0].marriageDate
+                      ).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <strong>Marriage Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].marriageAddress}
+                    </p>
+                    <p>
+                      <strong>Assigned Team ID:</strong>{" "}
+                      {selectedCase.caseDetails[0].teamId}
+                    </p>
+                    <p>
+                      <strong>Supervisor ID:</strong>{" "}
+                      {selectedCase.caseDetails[0].supervisorId}
+                    </p>
+                  </CardContent>
+                </Card>
               </>
             )}
           </div>
-          <DrawerFooter className="flex-col items-start">
-            <Button onClick={handleViewReports}>
-              <FileText className="h-4 w-4 mr-2" />
-              View Team Reports
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => alert("Final Report Generation logic goes here.")}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Generate Final Report
-            </Button>
+          <DrawerFooter className="border-t flex-row justify-between">
             <DrawerClose asChild>
-              <Button variant="outline" className="mt-4">
-                Close
-              </Button>
+              <Button variant="outline">Close</Button>
             </DrawerClose>
+            <div className="space-x-2">
+              <Button onClick={handleViewReports}>
+                <FileText className="h-4 w-4 mr-2" />
+                View Team Reports
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => toast.info("Feature Coming Soon")}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Generate Final Report
+              </Button>
+            </div>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
       <Dialog open={isReportsModalOpen} onOpenChange={setIsReportsModalOpen}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
           <DialogHeader>
@@ -698,9 +757,7 @@ export function SdmDashboard() {
                     </Label>
                     <Textarea
                       id={`feedback-${report.id}`}
-                      placeholder={`Your feedback on ${
-                        personMap.get(report.personId)?.firstName
-                      }'s report...`}
+                      placeholder={`Your feedback...`}
                       value={reportFeedbacks[report.id] || ""}
                       onChange={(e) =>
                         setReportFeedbacks((prev) => ({

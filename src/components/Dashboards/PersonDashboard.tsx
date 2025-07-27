@@ -27,46 +27,47 @@ import {
   User,
   Edit3,
   Save,
-  X,
-  MessageSquare,
   Mail,
   Phone,
   MapPin,
   Building,
-  Calendar,
-  ShieldQuestion,
   Star,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Case, TeamFormation, Person, Report, Department } from "@/types";
+import type { Case, Person, Report, Department, TeamFormation } from "@/types";
 import { caseService } from "../../api/services/case.service";
 import { reportService } from "../../api/services/report.service";
 import { personService } from "../../api/services/person.service";
 import { teamFormationService } from "../../api/services/team-formation.service";
 import { departmentService } from "../../api/services/department.service";
 import { toast } from "../ui/sonner";
+import { Skeleton } from "../ui/skeleton";
 
-// Assume the Report type might be extended with feedback from the backend
-interface ReportWithFeedback extends Report {
-  sdmFeedback?: string; // Optional feedback field
-}
+// --- DATA MAPPERS ---
+const mapApiCaseToStateCase = (apiCase: any): Case => {
+  const details = apiCase.caseDetails?.[0];
+  return {
+    ...apiCase,
+    complainantName: details?.girlName || "Unknown Complainant",
+    description: `Case involving ${details?.girlName || "N/A"} at ${
+      details?.marriageAddress || "N/A"
+    }.`,
+    district: details?.girlSubdivision || "Unknown District",
+    caseAddress: details?.girlAddress || "No address provided",
+  };
+};
 
 export function PersonDashboard() {
-  const { user } = useAuth(); // The user object from AuthContext holds the profile data.
-
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("active");
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedCaseTeam, setSelectedCaseTeam] = useState<Person[]>([]);
-  const [selectedCaseReports, setSelectedCaseReports] = useState<
-    ReportWithFeedback[]
-  >([]);
+  const [selectedCaseReports, setSelectedCaseReports] = useState<Report[]>([]);
   const [reportContent, setReportContent] = useState("");
   const [cases, setCases] = useState<Case[]>([]);
-  const [reports, setReports] = useState<ReportWithFeedback[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
-
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isCaseDrawerOpen, setIsCaseDrawerOpen] = useState(false);
 
@@ -78,29 +79,28 @@ export function PersonDashboard() {
 
     setLoading(true);
     try {
-      const [allCases, userReports, allDepartments] = await Promise.all([
+      const [allCasesData, allDepartments] = await Promise.all([
         caseService.getAll(),
-        reportService.getByPersonId(user.id),
         departmentService.getAll(),
       ]);
+
+      const mappedCases = allCasesData.map(mapApiCaseToStateCase);
       setDepartments(allDepartments);
 
-      const userCases = allCases.filter((c) =>
-        c.caseDetails?.some(
-          (detail) =>
-            detail.policeMembers?.includes(user.id) ||
-            detail.diceMembers?.includes(user.id) ||
-            detail.adminMembers?.includes(user.id)
-        )
-      );
+      // Correctly filter cases where the user is a member
+      const userCases = mappedCases.filter((c) => {
+        const details = c.caseDetails?.[0];
+        if (!details || !details.departmentMembers) return false;
+
+        const allMemberIds = Object.values(details.departmentMembers).flat();
+        return allMemberIds.includes(user.id);
+      });
 
       setCases(userCases);
-      setReports(userReports);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast.error("Error Loading Data", {
-        description:
-          "There was a problem fetching your dashboard data. Please try again later.",
+        description: "Could not load dashboard data.",
       });
     } finally {
       setLoading(false);
@@ -110,8 +110,6 @@ export function PersonDashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
-    } else {
-      setLoading(false);
     }
   }, [user, loadDashboardData]);
 
@@ -123,29 +121,23 @@ export function PersonDashboard() {
   const openCaseDrawer = async (caseItem: Case) => {
     setSelectedCase(caseItem);
     setIsCaseDrawerOpen(true);
-    setSelectedCaseTeam([]);
-    setSelectedCaseReports([]);
-
+    setReportContent("");
+    setEditingReport(null);
     try {
       const [teamFormation, reportsForCase] = await Promise.all([
         teamFormationService.getByCaseId(caseItem.id).catch(() => null),
         reportService.getByCaseId(caseItem.id).catch(() => []),
       ]);
-
       setSelectedCaseReports(reportsForCase);
-
       if (teamFormation?.member_ids) {
-        const memberPromises = teamFormation.member_ids.map((id) =>
-          personService.getById(id)
+        const memberDetails = await Promise.all(
+          teamFormation.member_ids.map((id) => personService.getById(id))
         );
-        const memberDetails = await Promise.all(memberPromises);
         setSelectedCaseTeam(memberDetails);
       }
     } catch (error) {
       console.error("Could not fetch details for case:", error);
-      toast.error("Error", {
-        description: "Could not fetch case details. Please try again.",
-      });
+      toast.error("Error", { description: "Could not fetch case details." });
     }
   };
 
@@ -158,16 +150,15 @@ export function PersonDashboard() {
           content: reportContent,
         });
         toast.success("Report Submitted", {
-          description: "Your progress report has been successfully submitted.",
+          description: "Your report has been submitted.",
         });
         setReportContent("");
-        // Refresh the reports in the drawer
         const reportsForCase = await reportService.getByCaseId(selectedCase.id);
         setSelectedCaseReports(reportsForCase);
       } catch (error) {
         console.error("Error submitting report:", error);
         toast.error("Submission Failed", {
-          description: "There was an error submitting your report.",
+          description: "Could not submit your report.",
         });
       }
     }
@@ -180,30 +171,23 @@ export function PersonDashboard() {
           content: editingReport.content,
         });
         toast.success("Report Updated", {
-          description: "Your report has been successfully updated.",
+          description: "Your report has been updated.",
         });
         setEditingReport(null);
-        // Refresh the reports in the drawer
         const reportsForCase = await reportService.getByCaseId(selectedCase.id);
         setSelectedCaseReports(reportsForCase);
       } catch (error) {
         console.error("Error updating report:", error);
         toast.error("Update Failed", {
-          description: "There was an error updating your report.",
+          description: "Could not update your report.",
         });
       }
     }
   };
 
-  const activeCases = cases.filter(
-    (c) => c.status === "INVESTIGATING" || c.status === "active"
-  );
-  const pendingCases = cases.filter(
-    (c) => c.status === "REPORTED" || c.status === "pending"
-  );
-  const resolvedCases = cases.filter(
-    (c) => c.status === "CLOSED" || c.status === "resolved"
-  );
+  const activeCases = cases.filter((c) => c.status === "INVESTIGATING");
+  const pendingCases = cases.filter((c) => c.status === "REPORTED");
+  const resolvedCases = cases.filter((c) => c.status === "CLOSED");
 
   const sidebarItems = [
     {
@@ -274,11 +258,8 @@ export function PersonDashboard() {
   if (loading) {
     return (
       <DashboardLayout title="Personnel Dashboard" sidebar={Sidebar}>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading dashboard...</p>
-          </div>
+        <div className="p-6">
+          <Skeleton className="h-96" />
         </div>
       </DashboardLayout>
     );
@@ -286,16 +267,11 @@ export function PersonDashboard() {
 
   return (
     <DashboardLayout title="Personnel Dashboard" sidebar={Sidebar}>
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold capitalize">{activeTab} Cases</h2>
           <div className="text-sm text-gray-500">
-            Department:{" "}
-            <Badge>
-              {user?.departmentId
-                ? departmentMap.get(user.departmentId)
-                : "N/A"}
-            </Badge>
+            Department: <Badge>{user?.officeName || "N/A"}</Badge>
           </div>
         </div>
         <div className="grid gap-4">
@@ -306,21 +282,12 @@ export function PersonDashboard() {
                   <h3 className="text-lg font-semibold">
                     {case_.complainantName}
                   </h3>
-                  <p className="text-gray-600 mb-3">{case_.description}</p>
+                  <p className="text-gray-600 mb-3 line-clamp-2">
+                    {case_.description}
+                  </p>
                   <Badge variant="outline">{case_.status}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  {activeTab === "pending" && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() =>
-                        alert(`Withdraw request for case ${case_.id}`)
-                      }
-                    >
-                      <ShieldQuestion className="h-4 w-4 mr-1" /> Withdraw
-                    </Button>
-                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -348,7 +315,7 @@ export function PersonDashboard() {
         open={isProfileDrawerOpen}
         onOpenChange={setIsProfileDrawerOpen}
       >
-        <DrawerContent className="w-1/3 h-screen mt-0">
+        <DrawerContent className="w-full md:w-1/3 h-screen mt-0">
           <DrawerHeader className="border-b">
             <DrawerTitle>My Profile</DrawerTitle>
           </DrawerHeader>
@@ -372,7 +339,6 @@ export function PersonDashboard() {
                 </div>
                 <Card>
                   <CardContent className="pt-6 space-y-4">
-                    {/* --- CORRECTED: All properties now match the provided Person type --- */}
                     <div className="flex items-center gap-3">
                       <Mail className="h-5 w-5 text-muted-foreground" />
                       <span>{user.email}</span>
@@ -387,11 +353,7 @@ export function PersonDashboard() {
                     </div>
                     <div className="flex items-center gap-3">
                       <Building className="h-5 w-5 text-muted-foreground" />
-                      <span>
-                        {user.departmentId
-                          ? departmentMap.get(user.departmentId)
-                          : "Not Assigned"}
-                      </span>
+                      <span>{user.officeName || "Not Assigned"}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -411,7 +373,7 @@ export function PersonDashboard() {
         open={isCaseDrawerOpen}
         onOpenChange={setIsCaseDrawerOpen}
       >
-        <DrawerContent className="w-2/3 h-screen mt-0">
+        <DrawerContent className="w-full md:w-2/3 h-screen mt-0">
           <DrawerHeader className="p-4 border-b">
             <DrawerTitle>{selectedCase?.complainantName}</DrawerTitle>
             <DrawerDescription>
@@ -422,10 +384,10 @@ export function PersonDashboard() {
           <div className="flex-grow p-4 overflow-y-auto">
             <Tabs defaultValue="reports">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="details">Submit Your Report</TabsTrigger>
+                <TabsTrigger value="submit">Submit Your Report</TabsTrigger>
                 <TabsTrigger value="reports">View Team Reports</TabsTrigger>
               </TabsList>
-              <TabsContent value="details" className="pt-4">
+              <TabsContent value="submit" className="pt-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Submit Progress Report</CardTitle>
@@ -447,7 +409,10 @@ export function PersonDashboard() {
               </TabsContent>
               <TabsContent value="reports" className="space-y-4 pt-4">
                 {selectedCaseReports.map((report) => (
-                  <Card key={report.id} className="bg-slate-50">
+                  <Card
+                    key={report.id}
+                    className="bg-slate-50 dark:bg-slate-900"
+                  >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />
@@ -500,17 +465,17 @@ export function PersonDashboard() {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                           {report.content}
                         </p>
                       )}
-                      {(report.sdmFeedback) && (
+                      {report.sdmFeedback && (
                         <div className="mt-4 border-t pt-3">
                           <h5 className="text-sm font-semibold flex items-center gap-2 mb-2">
                             <Star className="h-4 w-4 text-yellow-500" />
                             Feedback from Supervisor
                           </h5>
-                          <p className="text-sm text-muted-foreground p-2 bg-white rounded border">
+                          <p className="text-sm text-muted-foreground p-2 bg-white dark:bg-slate-800 rounded border">
                             {report.sdmFeedback}
                           </p>
                         </div>
