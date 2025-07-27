@@ -1,86 +1,73 @@
-// src/types.ts
-
+// src/types/index.ts
 
 export interface Case {
-  id: string; 
+  id: string;
   complainantName: string;
   complainantPhone: string;
   caseAddress: string;
   district: string;
-  state: string;
   description: string;
   reportedAt: string;
-  createdBy: string; 
-  status: 'REPORTED' | 'INVESTIGATING' | 'CLOSED' | 'active' | 'pending' | 'resolved'; // Include all possible statuses
-  createdAt: string; 
+  createdBy: string | null;
+  status: 'REPORTED' | 'INVESTIGATING' | 'CLOSED' | 'active' | 'pending' | 'resolved';
+  createdAt: string;
   updatedAt: string;
-  // This represents the nested details object
   caseDetails: CaseDetail[];
 }
 
 export interface CaseDetail {
-    id: string;
-    caseId: string;
-    notes: string;
-    evidencePath: string;
-    createdAt: string;
-    updatedAt: string;
-    policeMembers: string[];
-    diceMembers: string[];
-    adminMembers: string[];
-    supervisorId: string;
-    marriageDate: string;
-    boyName: string;
-    boyFatherName: string;
-    boyAddress: string;
-    boyAge: number;
-    girlName: string;
-    girlFatherName: string;
-    girlAge: number;
-    girlAddress: string;
-    girlVillage: string;
-    girlPoliceStation: string;
-    girlPostOffice: string;
-    girlSubdivision: string;
-    girlDistrict: string;
-    teamId: string;
-    marriageAddress: string;
+  id: string;
+  caseId: string;
+  notes: string | null;
+  evidencePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+  departmentMembers: Record<string, any>; // Assuming this is an object
+  supervisorId: string;
+  marriageDate: string;
+  boyName: string;
+  boyFatherName: string;
+  boyAddress: string;
+  girlName: string;
+  girlFatherName: string;
+  girlAddress: string;
+  girlSubdivision: string;
+  teamId: string;
+  marriageAddress: string;
 }
 
-
 export interface TeamFormation {
-  team_id: string; 
-  case_id: string; 
+  team_id: string;
+  case_id: string;
   supervisor_id: string;
   member_ids: string[];
-  admin_status?: string;
-  police_status?: string;
-  dice_status?: string;
-  response_status?: string;
   formed_at?: string;
 }
 
 export interface Report {
-  id: number; 
-  caseId: string; 
+  id: number;
+  caseId: string;
   personId: string;
   content: string;
   submittedAt: string;
   sdmFeedback?: string;
 }
 
+// This now reflects the backend structure
 export interface Person {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
-  departmentId?: string;
-  role: "MEMBER" | "SUPERADMIN" | "SDM" | "DM" | "SP";
+  departmentId?: string; // We will try to populate this
+  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN" | "SDM" | "DM" | "SP";
   address: string;
   gender: string;
   phoneNumber: string;
+  // New fields from the API response
+  officeName: string; 
+  district: string;
 }
-
 
 export interface Department {
   id: string;
