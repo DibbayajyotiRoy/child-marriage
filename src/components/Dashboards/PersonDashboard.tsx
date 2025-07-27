@@ -31,7 +31,6 @@ import {
   Phone,
   MapPin,
   Building,
-  ShieldQuestion,
   Star,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -88,10 +87,12 @@ export function PersonDashboard() {
       const mappedCases = allCasesData.map(mapApiCaseToStateCase);
       setDepartments(allDepartments);
 
+      // Correctly filter cases where the user is a member
       const userCases = mappedCases.filter((c) => {
         const details = c.caseDetails?.[0];
         if (!details || !details.departmentMembers) return false;
 
+        // Flatten all member IDs from all departments in the case
         const allMemberIds = Object.values(details.departmentMembers).flat();
         return allMemberIds.includes(user.id);
       });
@@ -121,6 +122,8 @@ export function PersonDashboard() {
   const openCaseDrawer = async (caseItem: Case) => {
     setSelectedCase(caseItem);
     setIsCaseDrawerOpen(true);
+    setReportContent("");
+    setEditingReport(null);
     try {
       const [teamFormation, reportsForCase] = await Promise.all([
         teamFormationService.getByCaseId(caseItem.id).catch(() => null),
@@ -280,7 +283,9 @@ export function PersonDashboard() {
                   <h3 className="text-lg font-semibold">
                     {case_.complainantName}
                   </h3>
-                  <p className="text-gray-600 mb-3">{case_.description}</p>
+                  <p className="text-gray-600 mb-3 line-clamp-2">
+                    {case_.description}
+                  </p>
                   <Badge variant="outline">{case_.status}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -311,7 +316,7 @@ export function PersonDashboard() {
         open={isProfileDrawerOpen}
         onOpenChange={setIsProfileDrawerOpen}
       >
-        <DrawerContent className="w-1/3 h-screen mt-0">
+        <DrawerContent className="w-full md:w-1/3 h-screen mt-0">
           <DrawerHeader className="border-b">
             <DrawerTitle>My Profile</DrawerTitle>
           </DrawerHeader>
@@ -369,7 +374,7 @@ export function PersonDashboard() {
         open={isCaseDrawerOpen}
         onOpenChange={setIsCaseDrawerOpen}
       >
-        <DrawerContent className="w-2/3 h-screen mt-0">
+        <DrawerContent className="w-full md:w-2/3 h-screen mt-0">
           <DrawerHeader className="p-4 border-b">
             <DrawerTitle>{selectedCase?.complainantName}</DrawerTitle>
             <DrawerDescription>
@@ -380,10 +385,10 @@ export function PersonDashboard() {
           <div className="flex-grow p-4 overflow-y-auto">
             <Tabs defaultValue="reports">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="details">Submit Your Report</TabsTrigger>
+                <TabsTrigger value="submit">Submit Your Report</TabsTrigger>
                 <TabsTrigger value="reports">View Team Reports</TabsTrigger>
               </TabsList>
-              <TabsContent value="details" className="pt-4">
+              <TabsContent value="submit" className="pt-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Submit Progress Report</CardTitle>
@@ -405,7 +410,10 @@ export function PersonDashboard() {
               </TabsContent>
               <TabsContent value="reports" className="space-y-4 pt-4">
                 {selectedCaseReports.map((report) => (
-                  <Card key={report.id} className="bg-slate-50">
+                  <Card
+                    key={report.id}
+                    className="bg-slate-50 dark:bg-slate-900"
+                  >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />
@@ -458,7 +466,7 @@ export function PersonDashboard() {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                           {report.content}
                         </p>
                       )}
@@ -468,7 +476,7 @@ export function PersonDashboard() {
                             <Star className="h-4 w-4 text-yellow-500" />
                             Feedback from Supervisor
                           </h5>
-                          <p className="text-sm text-muted-foreground p-2 bg-white rounded border">
+                          <p className="text-sm text-muted-foreground p-2 bg-white dark:bg-slate-800 rounded border">
                             {report.sdmFeedback}
                           </p>
                         </div>
