@@ -35,9 +35,9 @@ const Index = () => {
       return <SuperadminDashboard />;
 
     case "MEMBER":
+    case "SUPERVISOR":
       return <PersonDashboard />;
 
-    // 4. Add routing for the new roles
     case "SDM":
       return <SdmDashboard />;
 

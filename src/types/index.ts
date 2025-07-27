@@ -59,13 +59,15 @@ export interface Person {
   firstName: string;
   lastName: string;
   email: string;
-  departmentId?: string; // This will be mapped by matching officeName
-  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN" | "SDM" | "DM" | "SP";
+  departmentId?: string;
+  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN" | "SDM" | "DM" | "SP"; 
   address: string;
   gender: string;
   phoneNumber: string;
   officeName: string; // Keep original office name
   district: string;
+  designation: string | null;
+  rank: number | null;
 }
 
 
