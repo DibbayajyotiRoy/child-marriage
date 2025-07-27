@@ -66,6 +66,7 @@ export interface Report {
   personId: string;
   content: string;
   submittedAt: string;
+  sdmFeedback?: string;
 }
 
 export interface Person {

@@ -30,6 +30,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
+import {
   Settings,
   Users,
   Shield,
@@ -50,7 +59,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
-// --- API Service Imports ---
+// API Service Imports
 import {
   departmentService,
   type CreateDepartmentRequest,
@@ -61,7 +70,7 @@ import { reportService } from "@/api/services/report.service";
 import { teamFormationService } from "@/api/services/team-formation.service";
 import { postService } from "@/api/services/post.service";
 
-// --- Type Definitions ---
+// Type Definitions
 import type {
   Department,
   Person as BasePerson,
@@ -71,12 +80,11 @@ import type {
   Post,
 } from "@/types";
 
-// Enriched local types to match expected data structure
+// Local Component Types
 interface Person extends BasePerson {
   departmentId?: string;
   role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
 }
-
 interface EnrichedCase extends BaseCase {
   id: string;
   title: string;
@@ -87,12 +95,10 @@ interface EnrichedCase extends BaseCase {
   status: string;
   reportedAt: string;
 }
-
 interface CaseDetails extends EnrichedCase {
   reports: Report[];
   teamFormation: TeamFormation | null;
 }
-
 interface ActivityLogEntry {
   id: number;
   timestamp: string;
@@ -116,7 +122,7 @@ interface EditPersonState {
   person: Person | null;
 }
 
-// --- Constants ---
+// Constants
 const TRIPURA_SUBDIVISIONS = [
   "Sadar",
   "Mohanpur",
@@ -157,6 +163,7 @@ const INITIAL_PERSON_FORM_STATE = {
 };
 const INITIAL_DEPARTMENT_FORM_STATE: CreateDepartmentRequest = {
   name: "",
+  district: "Sadar",
 };
 const INITIAL_CASE_FORM_STATE = {
   title: "",
@@ -164,13 +171,8 @@ const INITIAL_CASE_FORM_STATE = {
   departmentId: "",
   createdBy: "00000000-0000-0000-0000-000000000000",
 };
-const INITIAL_POST_FORM_STATE = {
-  postName: "",
-  departmentId: "",
-  rank: 0,
-};
+const INITIAL_POST_FORM_STATE = { postName: "", departmentId: "", rank: 0 };
 
-// --- Helper Function ---
 const getDeptCategory = (
   deptName: string
 ): "POLICE" | "DICE" | "ADMINISTRATION" | null => {
@@ -193,7 +195,7 @@ export function SuperadminDashboard() {
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
-  const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+  const [isPersonDrawerOpen, setIsPersonDrawerOpen] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isCreateCaseModalOpen, setIsCreateCaseModalOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -355,6 +357,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const handleAddPost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postForm.postName || !postForm.departmentId || postForm.rank <= 0) {
@@ -366,11 +369,9 @@ export function SuperadminDashboard() {
       });
       return;
     }
-
     const selectedDept = departments.find(
       (d) => d.id === postForm.departmentId
     );
-
     if (!selectedDept) {
       setInfoModal({
         isOpen: true,
@@ -380,9 +381,7 @@ export function SuperadminDashboard() {
       });
       return;
     }
-
     const departmentCategory = getDeptCategory(selectedDept.name);
-
     if (!departmentCategory) {
       setInfoModal({
         isOpen: true,
@@ -392,7 +391,6 @@ export function SuperadminDashboard() {
       });
       return;
     }
-
     try {
       await postService.create({
         postName: postForm.postName,
@@ -417,6 +415,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const handleDeleteDepartment = async (departmentId: string) => {
     try {
       await departmentService.deleteDepartment(departmentId);
@@ -440,6 +439,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const confirmDeleteDepartment = (departmentId: string) => {
     setConfirmationModal({
       isOpen: true,
@@ -451,8 +451,6 @@ export function SuperadminDashboard() {
 
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // --- Form Validation ---
     const {
       firstName,
       lastName,
@@ -488,7 +486,6 @@ export function SuperadminDashboard() {
       return;
     }
 
-    // --- Derive Payload Fields ---
     const selectedDept = departments.find((d) => d.id === departmentId);
     if (!selectedDept) {
       setInfoModal({
@@ -511,29 +508,29 @@ export function SuperadminDashboard() {
       return;
     }
 
-    // --- Construct Final Payload ---
+    // --- REVERSED PAYLOAD LOGIC ---
     const payload = {
       firstName,
       lastName,
       email,
-      phoneNumber,
-      gender,
-      address,
-      role: personModalType === "police" ? "SUPERVISOR" : "MEMBER",
-      department: departmentCategory,
       password,
+      departmentId,
+      role: personModalType === "police" ? "SUPERVISOR" : "MEMBER",
+      address,
+      gender,
+      phoneNumber,
       subdivision,
       designation,
-      officeName: selectedDept.name,
+      department: selectedDept.name, // CRITICAL FIX: 'department' now gets the specific office name.
+      officeName: departmentCategory, // CRITICAL FIX: 'officeName' now gets the category string.
       status: "ACTIVE",
-      subdivision: subdivision, // Using subdivision for subdivision
       rank,
     };
 
     try {
-      await personService.create(payload);
+      await personService.create(payload as any);
       await fetchData(true);
-      setIsPersonModalOpen(false);
+      setIsPersonDrawerOpen(false);
       setPersonForm(INITIAL_PERSON_FORM_STATE);
       setInfoModal({
         isOpen: true,
@@ -578,6 +575,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const handleDeletePerson = async (personId: string) => {
     try {
       await personService.deletePerson(personId);
@@ -597,6 +595,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const confirmDeletePerson = (personId: string) => {
     setConfirmationModal({
       isOpen: true,
@@ -605,6 +604,7 @@ export function SuperadminDashboard() {
       onConfirm: () => handleDeletePerson(personId),
     });
   };
+
   const handleCreateCase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!caseForm.title || !caseForm.description || !caseForm.departmentId)
@@ -635,11 +635,13 @@ export function SuperadminDashboard() {
       });
     }
   };
-  const openPersonModal = (type: "person" | "police", deptId?: string) => {
+
+  const openPersonDrawer = (type: "person" | "police", deptId?: string) => {
     setPersonModalType(type);
     setPersonForm({ ...INITIAL_PERSON_FORM_STATE, departmentId: deptId || "" });
-    setIsPersonModalOpen(true);
+    setIsPersonDrawerOpen(true);
   };
+
   const openPostModal = (department?: Department) => {
     setPostForm({
       ...INITIAL_POST_FORM_STATE,
@@ -647,6 +649,7 @@ export function SuperadminDashboard() {
     });
     setIsPostModalOpen(true);
   };
+
   const openEditPersonModal = (person: Person) => {
     setEditPersonState({ isOpen: true, person: person });
     setEditPersonForm({
@@ -656,6 +659,7 @@ export function SuperadminDashboard() {
       role: person.role || "MEMBER",
     });
   };
+
   const openIssueDetailsModal = async (caseItem: EnrichedCase) => {
     try {
       const [caseReportsData, caseTeam] = await Promise.all([
@@ -678,6 +682,7 @@ export function SuperadminDashboard() {
       });
     }
   };
+
   const handleCaseSearch = async () => {
     if (!caseIdSearch.trim()) return;
     setIsLoading(true);
@@ -698,6 +703,7 @@ export function SuperadminDashboard() {
       setIsLoading(false);
     }
   };
+
   const clearCaseSearch = () => {
     setCaseIdSearch("");
     setSearchedCase(null);
@@ -706,14 +712,13 @@ export function SuperadminDashboard() {
   const renderLoadingSkeletons = () => (
     <div className="p-6 space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
+        <Skeleton className="h-28" /> <Skeleton className="h-28" />
+        <Skeleton className="h-28" /> <Skeleton className="h-28" />
       </div>
       <Skeleton className="h-64" />
     </div>
   );
+
   const renderOverview = () => (
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -807,10 +812,10 @@ export function SuperadminDashboard() {
       </div>
     </div>
   );
+
   const renderDepartmentDetails = () => {
     const dept = departments.find((d) => d.id === selectedDepartment);
     if (!dept) return <div>Department not found.</div>;
-
     const departmentCategory = getDeptCategory(dept.name);
     const deptMembers = persons.filter(
       (p) =>
@@ -832,7 +837,7 @@ export function SuperadminDashboard() {
             <Building /> {dept.name}
           </h2>
           <div className="flex gap-2">
-            <Button onClick={() => openPersonModal("person", dept.id)}>
+            <Button onClick={() => openPersonDrawer("person", dept.id)}>
               <UserPlus className="h-4 w-4 mr-2" /> Add Personnel
             </Button>
             <Button onClick={() => openPostModal(dept)}>
@@ -973,6 +978,7 @@ export function SuperadminDashboard() {
       </div>
     );
   };
+
   const renderIssuesList = (
     statusString: "active" | "pending" | "resolved"
   ) => {
@@ -992,11 +998,7 @@ export function SuperadminDashboard() {
             caseStatus.includes(s)
           );
         }
-
-        if (searchedCase) {
-          return matchesStatus;
-        }
-
+        if (searchedCase) return matchesStatus;
         return (
           matchesStatus &&
           (locationFilter === "all" ||
@@ -1008,7 +1010,6 @@ export function SuperadminDashboard() {
         );
       }
     );
-
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1102,6 +1103,7 @@ export function SuperadminDashboard() {
       </div>
     );
   };
+
   const Sidebar = (
     <nav className="p-4 bg-gray-50 h-full dark:bg-gray-900">
       <div className="space-y-2">
@@ -1191,7 +1193,7 @@ export function SuperadminDashboard() {
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-xs gap-2"
-                      onClick={() => openPersonModal("police", dept.id)}
+                      onClick={() => openPersonDrawer("police", dept.id)}
                     >
                       <UserPlus className="h-3 w-3" /> Add Personnel
                     </Button>
@@ -1235,9 +1237,7 @@ export function SuperadminDashboard() {
   );
 
   const renderContent = () => {
-    if (isLoading) {
-      return renderLoadingSkeletons();
-    }
+    if (isLoading) return renderLoadingSkeletons();
     switch (activeTab) {
       case "overview":
         return renderOverview();
@@ -1257,7 +1257,7 @@ export function SuperadminDashboard() {
   return (
     <DashboardLayout title="Superadmin Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
-      {/* --- MODALS --- */}
+
       <Dialog
         open={infoModal.isOpen}
         onOpenChange={() => setInfoModal((p) => ({ ...p, isOpen: false }))}
@@ -1315,6 +1315,207 @@ export function SuperadminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Drawer
+        direction="right"
+        open={isPersonDrawerOpen}
+        onOpenChange={setIsPersonDrawerOpen}
+      >
+        <DrawerContent className="w-full md:w-1/2 lg:w-1/3 h-screen mt-0 flex flex-col">
+          <DrawerHeader className="p-4 border-b">
+            <DrawerTitle>
+              Add New{" "}
+              {personModalType === "police" ? "Police Officer" : "Personnel"}
+            </DrawerTitle>
+            <DrawerDescription>
+              Fill out the form below to add a new person to the system.
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="flex-grow p-4 overflow-y-auto">
+            <form onSubmit={handleAddPerson} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="person-fname">First Name</Label>
+                  <Input
+                    id="person-fname"
+                    value={personForm.firstName}
+                    onChange={(e) =>
+                      setPersonForm((p) => ({
+                        ...p,
+                        firstName: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="person-lname">Last Name</Label>
+                  <Input
+                    id="person-lname"
+                    value={personForm.lastName}
+                    onChange={(e) =>
+                      setPersonForm((p) => ({ ...p, lastName: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="person-email">Email</Label>
+                <Input
+                  id="person-email"
+                  type="email"
+                  value={personForm.email}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({ ...p, email: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="person-password">Temporary Password</Label>
+                <Input
+                  id="person-password"
+                  type="password"
+                  value={personForm.password}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({ ...p, password: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="person-phone">Phone Number</Label>
+                <Input
+                  id="person-phone"
+                  value={personForm.phoneNumber}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({
+                      ...p,
+                      phoneNumber: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="person-gender">Gender</Label>
+                  <Select
+                    required
+                    value={personForm.gender}
+                    onValueChange={(value) =>
+                      setPersonForm((p) => ({ ...p, gender: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="person-rank">Rank</Label>
+                  <Input
+                    id="person-rank"
+                    type="number"
+                    value={personForm.rank}
+                    onChange={(e) =>
+                      setPersonForm((p) => ({
+                        ...p,
+                        rank: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    placeholder="e.g., 5"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="person-designation">Designation</Label>
+                <Input
+                  id="person-designation"
+                  value={personForm.designation}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({
+                      ...p,
+                      designation: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., Officer In-charge"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="person-address">Full Address</Label>
+                <Textarea
+                  id="person-address"
+                  value={personForm.address}
+                  onChange={(e) =>
+                    setPersonForm((p) => ({ ...p, address: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="person-subdivision">Sub-Division</Label>
+                <Select
+                  required
+                  value={personForm.subdivision}
+                  onValueChange={(value) =>
+                    setPersonForm((p) => ({ ...p, subdivision: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subdivision" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRIPURA_SUBDIVISIONS.map((subdivision) => (
+                      <SelectItem key={subdivision} value={subdivision}>
+                        {subdivision}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="person-dept">Department (Office)</Label>
+                <Select
+                  required
+                  value={personForm.departmentId}
+                  onValueChange={(value) =>
+                    setPersonForm((p) => ({ ...p, departmentId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DrawerFooter className="flex-row gap-4 px-0 pt-4">
+                <Button type="submit" className="w-full">
+                  Add Person
+                </Button>
+                <DrawerClose asChild className="w-full">
+                  <Button variant="outline">Cancel</Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </form>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
       <Dialog
         open={isDepartmentModalOpen}
         onOpenChange={setIsDepartmentModalOpen}
@@ -1345,189 +1546,6 @@ export function SuperadminDashboard() {
                 Cancel
               </Button>
               <Button type="submit">Add Department</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Add New{" "}
-              {personModalType === "police" ? "Police Officer" : "Personnel"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddPerson} className="space-y-4 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="person-fname">First Name</Label>
-                <Input
-                  id="person-fname"
-                  value={personForm.firstName}
-                  onChange={(e) =>
-                    setPersonForm((p) => ({ ...p, firstName: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="person-lname">Last Name</Label>
-                <Input
-                  id="person-lname"
-                  value={personForm.lastName}
-                  onChange={(e) =>
-                    setPersonForm((p) => ({ ...p, lastName: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="person-email">Email</Label>
-              <Input
-                id="person-email"
-                type="email"
-                value={personForm.email}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, email: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-password">Temporary Password</Label>
-              <Input
-                id="person-password"
-                type="password"
-                value={personForm.password}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, password: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-phone">Phone Number</Label>
-              <Input
-                id="person-phone"
-                value={personForm.phoneNumber}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, phoneNumber: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-gender">Gender</Label>
-              <Select
-                required
-                value={personForm.gender}
-                onValueChange={(value) =>
-                  setPersonForm((p) => ({ ...p, gender: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="person-designation">Designation</Label>
-              <Input
-                id="person-designation"
-                value={personForm.designation}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, designation: e.target.value }))
-                }
-                placeholder="e.g., Officer In-charge"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-rank">Rank</Label>
-              <Input
-                id="person-rank"
-                type="number"
-                value={personForm.rank}
-                onChange={(e) =>
-                  setPersonForm((p) => ({
-                    ...p,
-                    rank: parseInt(e.target.value, 10) || 0,
-                  }))
-                }
-                placeholder="e.g., 5"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-address">Address</Label>
-              <Textarea
-                id="person-address"
-                value={personForm.address}
-                onChange={(e) =>
-                  setPersonForm((p) => ({ ...p, address: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="person-subdivision">Sub-Division</Label>
-              <Select
-                required
-                value={personForm.subdivision}
-                onValueChange={(value) =>
-                  setPersonForm((p) => ({ ...p, subdivision: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a subdivision" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRIPURA_SUBDIVISIONS.map((subdivision) => (
-                    <SelectItem key={subdivision} value={subdivision}>
-                      {subdivision}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="person-dept">Department (Office)</Label>
-              <Select
-                required
-                value={personForm.departmentId}
-                onValueChange={(value) =>
-                  setPersonForm((p) => ({ ...p, departmentId: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsPersonModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">
-                Add {personModalType === "police" ? "Officer" : "Personnel"}
-              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

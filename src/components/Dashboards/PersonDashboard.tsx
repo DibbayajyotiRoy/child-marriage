@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { DashboardLayout } from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import { reportService } from "../../api/services/report.service";
 import { personService } from "../../api/services/person.service";
 import { teamFormationService } from "../../api/services/team-formation.service";
 import { departmentService } from "../../api/services/department.service";
+import { toast } from "../ui/sonner";
 
 // Assume the Report type might be extended with feedback from the backend
 interface ReportWithFeedback extends Report {
@@ -56,6 +57,9 @@ export function PersonDashboard() {
   const [activeTab, setActiveTab] = useState("active");
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedCaseTeam, setSelectedCaseTeam] = useState<Person[]>([]);
+  const [selectedCaseReports, setSelectedCaseReports] = useState<
+    ReportWithFeedback[]
+  >([]);
   const [reportContent, setReportContent] = useState("");
   const [cases, setCases] = useState<Case[]>([]);
   const [reports, setReports] = useState<ReportWithFeedback[]>([]);
@@ -66,7 +70,6 @@ export function PersonDashboard() {
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isCaseDrawerOpen, setIsCaseDrawerOpen] = useState(false);
 
-  // --- REWRITTEN: Data loading logic based on the correct types ---
   const loadDashboardData = useCallback(async () => {
     if (!user?.id) {
       setLoading(false);
@@ -75,7 +78,6 @@ export function PersonDashboard() {
 
     setLoading(true);
     try {
-      // Step 1: Fetch all necessary data in parallel.
       const [allCases, userReports, allDepartments] = await Promise.all([
         caseService.getAll(),
         reportService.getByPersonId(user.id),
@@ -83,7 +85,6 @@ export function PersonDashboard() {
       ]);
       setDepartments(allDepartments);
 
-      // Step 2: Filter cases where the user is a member of the case details.
       const userCases = allCases.filter((c) =>
         c.caseDetails?.some(
           (detail) =>
@@ -97,6 +98,10 @@ export function PersonDashboard() {
       setReports(userReports);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
+      toast.error("Error Loading Data", {
+        description:
+          "There was a problem fetching your dashboard data. Please try again later.",
+      });
     } finally {
       setLoading(false);
     }
@@ -118,8 +123,17 @@ export function PersonDashboard() {
   const openCaseDrawer = async (caseItem: Case) => {
     setSelectedCase(caseItem);
     setIsCaseDrawerOpen(true);
+    setSelectedCaseTeam([]);
+    setSelectedCaseReports([]);
+
     try {
-      const teamFormation = await teamFormationService.getByCaseId(caseItem.id);
+      const [teamFormation, reportsForCase] = await Promise.all([
+        teamFormationService.getByCaseId(caseItem.id).catch(() => null),
+        reportService.getByCaseId(caseItem.id).catch(() => []),
+      ]);
+
+      setSelectedCaseReports(reportsForCase);
+
       if (teamFormation?.member_ids) {
         const memberPromises = teamFormation.member_ids.map((id) =>
           personService.getById(id)
@@ -128,8 +142,10 @@ export function PersonDashboard() {
         setSelectedCaseTeam(memberDetails);
       }
     } catch (error) {
-      console.error("Could not fetch team for case:", error);
-      setSelectedCaseTeam([]);
+      console.error("Could not fetch details for case:", error);
+      toast.error("Error", {
+        description: "Could not fetch case details. Please try again.",
+      });
     }
   };
 
@@ -141,24 +157,40 @@ export function PersonDashboard() {
           personId: user.id,
           content: reportContent,
         });
+        toast.success("Report Submitted", {
+          description: "Your progress report has been successfully submitted.",
+        });
         setReportContent("");
-        await loadDashboardData();
+        // Refresh the reports in the drawer
+        const reportsForCase = await reportService.getByCaseId(selectedCase.id);
+        setSelectedCaseReports(reportsForCase);
       } catch (error) {
         console.error("Error submitting report:", error);
+        toast.error("Submission Failed", {
+          description: "There was an error submitting your report.",
+        });
       }
     }
   };
 
   const handleUpdateReport = async () => {
-    if (editingReport) {
+    if (editingReport && selectedCase) {
       try {
         await reportService.update(editingReport.id, {
           content: editingReport.content,
         });
+        toast.success("Report Updated", {
+          description: "Your report has been successfully updated.",
+        });
         setEditingReport(null);
-        await loadDashboardData();
+        // Refresh the reports in the drawer
+        const reportsForCase = await reportService.getByCaseId(selectedCase.id);
+        setSelectedCaseReports(reportsForCase);
       } catch (error) {
         console.error("Error updating report:", error);
+        toast.error("Update Failed", {
+          description: "There was an error updating your report.",
+        });
       }
     }
   };
@@ -414,83 +446,79 @@ export function PersonDashboard() {
                 </Card>
               </TabsContent>
               <TabsContent value="reports" className="space-y-4 pt-4">
-                {reports
-                  .filter((r) => r.caseId === selectedCase?.id)
-                  .map((report) => (
-                    <Card key={report.id} className="bg-slate-50">
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <span className="font-semibold">
-                            {selectedCaseTeam.find(
-                              (p) => p.id === report.personId
-                            )?.firstName || "Team Member"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            {new Date(report.submittedAt).toLocaleDateString()}
-                          </span>
-                          {report.personId === user?.id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => setEditingReport(report)}
-                            >
-                              <Edit3 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {editingReport?.id === report.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={editingReport.content}
-                              onChange={(e) =>
-                                setEditingReport((r) =>
-                                  r ? { ...r, content: e.target.value } : null
-                                )
-                              }
-                              rows={3}
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={handleUpdateReport}>
-                                <Save className="h-3 w-3 mr-1" />
-                                Save
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setEditingReport(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-700">
-                            {report.content}
-                          </p>
-                        )}
+                {selectedCaseReports.map((report) => (
+                  <Card key={report.id} className="bg-slate-50">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span className="font-semibold">
+                          {selectedCaseTeam.find(
+                            (p) => p.id === report.personId
+                          )?.firstName || "Team Member"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">
+                          {new Date(report.submittedAt).toLocaleDateString()}
+                        </span>
                         {report.personId === user?.id && (
-                          <div className="mt-4 border-t pt-3">
-                            <h5 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                              <Star className="h-4 w-4 text-yellow-500" />
-                              Feedback from Supervisor
-                            </h5>
-                            <p className="text-sm text-muted-foreground p-2 bg-white rounded border">
-                              {report.sdmFeedback ||
-                                "No feedback has been provided yet."}
-                            </p>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setEditingReport(report)}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
                         )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                {reports.filter((r) => r.caseId === selectedCase?.id).length ===
-                  0 && (
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {editingReport?.id === report.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editingReport.content}
+                            onChange={(e) =>
+                              setEditingReport((r) =>
+                                r ? { ...r, content: e.target.value } : null
+                              )
+                            }
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleUpdateReport}>
+                              <Save className="h-3 w-3 mr-1" />
+                              Save
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingReport(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-700">
+                          {report.content}
+                        </p>
+                      )}
+                      {(report.sdmFeedback) && (
+                        <div className="mt-4 border-t pt-3">
+                          <h5 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                            <Star className="h-4 w-4 text-yellow-500" />
+                            Feedback from Supervisor
+                          </h5>
+                          <p className="text-sm text-muted-foreground p-2 bg-white rounded border">
+                            {report.sdmFeedback}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+                {selectedCaseReports.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No reports submitted for this case yet.</p>
