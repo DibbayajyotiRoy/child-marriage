@@ -63,12 +63,32 @@ import { reportService } from "@/api/services/report.service";
 // --- Import central types ---
 import type { Person, Case, Report, Department } from "@/types";
 
-interface InfoModalState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  isError?: boolean;
-}
+// --- DATA MAPPERS ---
+const mapApiCaseToStateCase = (apiCase: any): Case => {
+  const details = apiCase.caseDetails?.[0];
+  return {
+    ...apiCase,
+    complainantName: details?.girlName || "Unknown Complainant",
+    description: `Case involving ${details?.girlName || "N/A"} at ${
+      details?.marriageAddress || "N/A"
+    }.`,
+    district: details?.girlSubdivision || "Unknown District",
+    caseAddress: details?.girlAddress || "No address provided",
+  };
+};
+
+const mapApiPersonToStatePerson = (
+  apiPerson: any,
+  departments: Department[]
+): Person => {
+  const dept = departments.find(
+    (d) => d.name.toLowerCase() === apiPerson.department?.toLowerCase()
+  );
+  return {
+    ...apiPerson,
+    departmentId: dept ? dept.id : undefined,
+  };
+};
 
 const TRIPURA_SUBDIVISIONS = [
   "Sadar",
@@ -118,22 +138,13 @@ export function SpDashboard() {
     Record<number, string>
   >({});
   const [isLoading, setIsLoading] = useState(true);
-
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [isPersonDetailModalOpen, setIsPersonDetailModalOpen] = useState(false);
   const [isIssueDrawerOpen, setIsIssueDrawerOpen] = useState(false);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
-
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-
-  const [infoModal, setInfoModal] = useState<InfoModalState>({
-    isOpen: false,
-    title: "",
-    message: "",
-  });
   const [personForm, setPersonForm] = useState(INITIAL_PERSON_FORM_STATE);
-
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
@@ -146,16 +157,20 @@ export function SpDashboard() {
         caseService.getAll().catch(() => []),
         departmentService.getAll().catch(() => []),
       ]);
-      setPersons(personData as Person[]);
-      setCases(caseData as Case[]);
-      setDepartments(departmentData as Department[]);
+
+      const fetchedDepartments = departmentData as Department[];
+      const mappedPersons = personData.map((p) =>
+        mapApiPersonToStatePerson(p, fetchedDepartments)
+      );
+      const mappedCases = caseData.map(mapApiCaseToStateCase);
+
+      setPersons(mappedPersons);
+      setCases(mappedCases);
+      setDepartments(fetchedDepartments);
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Connection Error",
-        message: "Failed to connect to the server.",
-        isError: true,
+      toast.error("Connection Error", {
+        description: "Failed to connect to the server.",
       });
     } finally {
       setIsLoading(false);
@@ -210,12 +225,6 @@ export function SpDashboard() {
       });
       return;
     }
-    if (!personForm.email || !personForm.password || !personForm.address) {
-      toast.error("Validation Error", {
-        description: "Please fill all required fields.",
-      });
-      return;
-    }
     try {
       await personService.create({
         ...personForm,
@@ -260,6 +269,7 @@ export function SpDashboard() {
   };
 
   const handleFeedbackSubmit = async () => {
+    // Logic is identical to SDM Dashboard
     const feedbackPromises = Object.entries(reportFeedbacks)
       .filter(([, feedbackText]) => feedbackText.trim() !== "")
       .map(([reportIdStr, sdmFeedback]) => {
@@ -269,22 +279,20 @@ export function SpDashboard() {
 
     if (feedbackPromises.length === 0) {
       toast.info("No Feedback", {
-        description: "Please write some feedback before submitting.",
+        description: "Please write feedback before submitting.",
       });
       return;
     }
 
     try {
       await Promise.all(feedbackPromises);
-      toast.success("Success", {
-        description: "All feedback has been submitted successfully.",
+      toast.success("Success!", {
+        description: "All feedback has been submitted.",
       });
       setIsReportsModalOpen(false);
     } catch (error) {
       console.error("Failed to submit feedback:", error);
-      toast.error("Submission Failed", {
-        description: "An error occurred while submitting feedback.",
-      });
+      toast.error("Submission Failed", { description: "An error occurred." });
     }
   };
 
@@ -425,7 +433,6 @@ export function SpDashboard() {
     <DashboardLayout title="SP Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
 
-      {/* Add Person Modal */}
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -433,9 +440,9 @@ export function SpDashboard() {
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
             <div>
-              <Label htmlFor="person-fname">First Name</Label>
+              <Label htmlFor="sp-person-fname">First Name</Label>
               <Input
-                id="person-fname"
+                id="sp-person-fname"
                 value={personForm.firstName}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, firstName: e.target.value }))
@@ -444,9 +451,9 @@ export function SpDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-lname">Last Name</Label>
+              <Label htmlFor="sp-person-lname">Last Name</Label>
               <Input
-                id="person-lname"
+                id="sp-person-lname"
                 value={personForm.lastName}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, lastName: e.target.value }))
@@ -455,9 +462,9 @@ export function SpDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-email">Email</Label>
+              <Label htmlFor="sp-person-email">Email</Label>
               <Input
-                id="person-email"
+                id="sp-person-email"
                 type="email"
                 value={personForm.email}
                 onChange={(e) =>
@@ -467,9 +474,9 @@ export function SpDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-password">Temporary Password</Label>
+              <Label htmlFor="sp-person-password">Temporary Password</Label>
               <Input
-                id="person-password"
+                id="sp-person-password"
                 type="password"
                 value={personForm.password}
                 onChange={(e) =>
@@ -479,9 +486,9 @@ export function SpDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-phone">Phone Number</Label>
+              <Label htmlFor="sp-person-phone">Phone Number</Label>
               <Input
-                id="person-phone"
+                id="sp-person-phone"
                 value={personForm.phoneNumber}
                 onChange={(e) =>
                   setPersonForm((p) => ({ ...p, phoneNumber: e.target.value }))
@@ -490,7 +497,7 @@ export function SpDashboard() {
               />
             </div>
             <div>
-              <Label htmlFor="person-gender">Gender</Label>
+              <Label htmlFor="sp-person-gender">Gender</Label>
               <Select
                 required
                 value={personForm.gender}
@@ -509,7 +516,7 @@ export function SpDashboard() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="person-address">Address (Subdivision)</Label>
+              <Label htmlFor="sp-person-address">Address (Subdivision)</Label>
               <Select
                 required
                 value={personForm.address}
@@ -542,8 +549,6 @@ export function SpDashboard() {
           </form>
         </DialogContent>
       </Dialog>
-
-      {/* Person Details Modal */}
       <Dialog
         open={isPersonDetailModalOpen}
         onOpenChange={setIsPersonDetailModalOpen}
@@ -562,16 +567,9 @@ export function SpDashboard() {
                 <strong>Email:</strong> {selectedPerson.email}
               </p>
               <p>
-                <strong>Phone:</strong> {selectedPerson.phoneNumber}
-              </p>
-              <p>
-                <strong>Gender:</strong> {selectedPerson.gender}
-              </p>
-              <p>
-                <strong>Address:</strong> {selectedPerson.address}
-              </p>
-              <p>
-                <strong>Department:</strong> {policeDept?.name || "N/A"}
+                <strong>Department:</strong>{" "}
+                {departments.find((d) => d.id === selectedPerson.departmentId)
+                  ?.name || "N/A"}
               </p>
               <p>
                 <strong>Role:</strong> <Badge>{selectedPerson.role}</Badge>
@@ -580,8 +578,6 @@ export function SpDashboard() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Issue Details Drawer */}
       <Drawer
         direction="right"
         open={isIssueDrawerOpen}
@@ -593,55 +589,19 @@ export function SpDashboard() {
             <DrawerDescription>ID: {selectedCase?.id}</DrawerDescription>
           </DrawerHeader>
           <div className="flex-grow p-4 overflow-y-auto space-y-4">
-            {selectedCase && (
-              <>
-                <p>
-                  <strong>Complainant:</strong> {selectedCase.complainantName}
-                </p>
-                <p>
-                  <strong>Status:</strong> <Badge>{selectedCase.status}</Badge>
-                </p>
-                <p>
-                  <strong>Description:</strong> {selectedCase.description}
-                </p>
-                {selectedCase.caseDetails?.[0] && (
-                  <div className="border-t pt-4 mt-4">
-                    <h4 className="font-bold">Girl's Details</h4>
-                    <p>
-                      {selectedCase.caseDetails[0].girlName} (Age:{" "}
-                      {selectedCase.caseDetails[0].girlAge})
-                    </p>
-                    <p>
-                      Address: {selectedCase.caseDetails[0].girlAddress},{" "}
-                      {selectedCase.caseDetails[0].girlSubdivision}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
+            {/* Case details render here */}
           </div>
           <DrawerFooter className="border-t flex-row justify-between">
             <DrawerClose asChild>
               <Button variant="outline">Close</Button>
             </DrawerClose>
-            <div className="space-x-2">
-              <Button onClick={handleViewReports}>
-                <FileText className="h-4 w-4 mr-2" />
-                View Reports
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => alert("Final Report logic goes here.")}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Generate Final Report
-              </Button>
-            </div>
+            <Button onClick={handleViewReports}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Reports
+            </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
-      {/* Reports Modal */}
       <Dialog open={isReportsModalOpen} onOpenChange={setIsReportsModalOpen}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
           <DialogHeader>
@@ -658,29 +618,18 @@ export function SpDashboard() {
                 <Card key={report.id}>
                   <CardHeader>
                     <CardTitle className="text-base">
-                      Report from: {personMap.get(report.personId)?.firstName}{" "}
-                      {personMap.get(report.personId)?.lastName}
+                      Report from: {personMap.get(report.personId)?.firstName}
                     </CardTitle>
-                    <CardDescription>
-                      Submitted on:{" "}
-                      {new Date(report.submittedAt).toLocaleString()}
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <p className="border p-2 rounded bg-gray-50 mb-2">
                       {report.content}
                     </p>
-                    <Label
-                      htmlFor={`feedback-${report.id}`}
-                      className="font-semibold"
-                    >
+                    <Label htmlFor={`feedback-${report.id}`}>
                       Provide Feedback:
                     </Label>
                     <Textarea
                       id={`feedback-${report.id}`}
-                      placeholder={`Your feedback on ${
-                        personMap.get(report.personId)?.firstName
-                      }'s report...`}
                       value={reportFeedbacks[report.id] || ""}
                       onChange={(e) =>
                         setReportFeedbacks((prev) => ({
@@ -693,9 +642,7 @@ export function SpDashboard() {
                 </Card>
               ))
             ) : (
-              <p className="text-center text-gray-500 py-10">
-                No reports have been submitted for this case yet.
-              </p>
+              <p>No reports submitted.</p>
             )}
           </div>
           <DialogFooter>
@@ -705,7 +652,7 @@ export function SpDashboard() {
             >
               Close
             </Button>
-            <Button onClick={handleFeedbackSubmit}>Submit All Feedback</Button>
+            <Button onClick={handleFeedbackSubmit}>Submit Feedback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
