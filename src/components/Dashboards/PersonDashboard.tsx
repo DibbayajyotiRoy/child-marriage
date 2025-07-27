@@ -92,7 +92,6 @@ export function PersonDashboard() {
         const details = c.caseDetails?.[0];
         if (!details || !details.departmentMembers) return false;
 
-        // Flatten all member IDs from all departments in the case
         const allMemberIds = Object.values(details.departmentMembers).flat();
         return allMemberIds.includes(user.id);
       });

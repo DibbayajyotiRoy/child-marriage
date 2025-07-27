@@ -225,6 +225,12 @@ export function SpDashboard() {
       });
       return;
     }
+    if (!personForm.email || !personForm.password || !personForm.address) {
+      toast.error("Validation Error", {
+        description: "Please fill all required fields.",
+      });
+      return;
+    }
     try {
       await personService.create({
         ...personForm,
@@ -269,7 +275,6 @@ export function SpDashboard() {
   };
 
   const handleFeedbackSubmit = async () => {
-    // Logic is identical to SDM Dashboard
     const feedbackPromises = Object.entries(reportFeedbacks)
       .filter(([, feedbackText]) => feedbackText.trim() !== "")
       .map(([reportIdStr, sdmFeedback]) => {
@@ -549,6 +554,7 @@ export function SpDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
       <Dialog
         open={isPersonDetailModalOpen}
         onOpenChange={setIsPersonDetailModalOpen}
@@ -567,9 +573,13 @@ export function SpDashboard() {
                 <strong>Email:</strong> {selectedPerson.email}
               </p>
               <p>
-                <strong>Department:</strong>{" "}
-                {departments.find((d) => d.id === selectedPerson.departmentId)
-                  ?.name || "N/A"}
+                <strong>Phone:</strong> {selectedPerson.phoneNumber}
+              </p>
+              <p>
+                <strong>Address:</strong> {selectedPerson.address}
+              </p>
+              <p>
+                <strong>Department:</strong> {policeDept?.name || "Police"}
               </p>
               <p>
                 <strong>Role:</strong> <Badge>{selectedPerson.role}</Badge>
@@ -578,6 +588,7 @@ export function SpDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
       <Drawer
         direction="right"
         open={isIssueDrawerOpen}
@@ -585,11 +596,103 @@ export function SpDashboard() {
       >
         <DrawerContent className="w-1/2 mt-0 flex flex-col h-screen">
           <DrawerHeader className="text-left border-b">
-            <DrawerTitle>Case Details</DrawerTitle>
+            <DrawerTitle>
+              Case Details: {selectedCase?.complainantName}
+            </DrawerTitle>
             <DrawerDescription>ID: {selectedCase?.id}</DrawerDescription>
           </DrawerHeader>
           <div className="flex-grow p-4 overflow-y-auto space-y-4">
-            {/* Case details render here */}
+            {selectedCase && selectedCase.caseDetails?.[0] && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Case Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <Badge>{selectedCase.status}</Badge>
+                    </p>
+                    <p>
+                      <strong>Description:</strong> {selectedCase.description}
+                    </p>
+                    <p>
+                      <strong>Reported At:</strong>{" "}
+                      {new Date(selectedCase.reportedAt).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Girl's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlName}
+                    </p>
+                    <p>
+                      <strong>Father's Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlFatherName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlAddress}
+                    </p>
+                    <p>
+                      <strong>Subdivision:</strong>{" "}
+                      {selectedCase.caseDetails[0].girlSubdivision}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Boy's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyName}
+                    </p>
+                    <p>
+                      <strong>Father's Name:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyFatherName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].boyAddress}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Marriage & Team Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Marriage Date:</strong>{" "}
+                      {new Date(
+                        selectedCase.caseDetails[0].marriageDate
+                      ).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <strong>Marriage Address:</strong>{" "}
+                      {selectedCase.caseDetails[0].marriageAddress}
+                    </p>
+                    <p>
+                      <strong>Assigned Team ID:</strong>{" "}
+                      {selectedCase.caseDetails[0].teamId}
+                    </p>
+                    <p>
+                      <strong>Supervisor ID:</strong>{" "}
+                      {selectedCase.caseDetails[0].supervisorId}
+                    </p>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
           <DrawerFooter className="border-t flex-row justify-between">
             <DrawerClose asChild>
@@ -602,6 +705,7 @@ export function SpDashboard() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
       <Dialog open={isReportsModalOpen} onOpenChange={setIsReportsModalOpen}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
           <DialogHeader>
@@ -618,18 +722,27 @@ export function SpDashboard() {
                 <Card key={report.id}>
                   <CardHeader>
                     <CardTitle className="text-base">
-                      Report from: {personMap.get(report.personId)?.firstName}
+                      Report from: {personMap.get(report.personId)?.firstName}{" "}
+                      {personMap.get(report.personId)?.lastName}
                     </CardTitle>
+                    <CardDescription>
+                      Submitted on:{" "}
+                      {new Date(report.submittedAt).toLocaleString()}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <p className="border p-2 rounded bg-gray-50 mb-2">
                       {report.content}
                     </p>
-                    <Label htmlFor={`feedback-${report.id}`}>
+                    <Label
+                      htmlFor={`feedback-${report.id}`}
+                      className="font-semibold"
+                    >
                       Provide Feedback:
                     </Label>
                     <Textarea
                       id={`feedback-${report.id}`}
+                      placeholder={`Your feedback...`}
                       value={reportFeedbacks[report.id] || ""}
                       onChange={(e) =>
                         setReportFeedbacks((prev) => ({
@@ -642,7 +755,9 @@ export function SpDashboard() {
                 </Card>
               ))
             ) : (
-              <p>No reports submitted.</p>
+              <p className="text-center text-gray-500 py-10">
+                No reports have been submitted for this case yet.
+              </p>
             )}
           </div>
           <DialogFooter>
@@ -652,7 +767,7 @@ export function SpDashboard() {
             >
               Close
             </Button>
-            <Button onClick={handleFeedbackSubmit}>Submit Feedback</Button>
+            <Button onClick={handleFeedbackSubmit}>Submit All Feedback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
