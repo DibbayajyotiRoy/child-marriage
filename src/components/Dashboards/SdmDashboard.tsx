@@ -48,12 +48,16 @@ import {
   Send,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "../ui/sonner";
 
 // --- API Service Imports ---
-import { personService } from "@/api/services/person.service";
+import {
+  personService,
+  type CreatePersonRequest,
+} from "@/api/services/person.service";
 import { caseService } from "@/api/services/case.service";
-import { departmentService } from "@/api/services/department.service"; // Added for department filter
-import { reportService } from "@/api/services/report.service"; // Added for viewing reports
+import { departmentService } from "@/api/services/department.service";
+import { reportService } from "@/api/services/report.service";
 
 // --- Import central types ---
 import type { Person, Case, Report, Department } from "@/types";
@@ -91,9 +95,7 @@ const TRIPURA_SUBDIVISIONS = [
   "Kumarghat",
 ];
 
-const INITIAL_PERSON_FORM_STATE: Omit<Person, "id" | "role"> & {
-  password: string;
-} = {
+const INITIAL_PERSON_FORM_STATE: Omit<CreatePersonRequest, "role"> = {
   firstName: "",
   lastName: "",
   email: "",
@@ -101,19 +103,18 @@ const INITIAL_PERSON_FORM_STATE: Omit<Person, "id" | "role"> & {
   address: "",
   gender: "Male",
   phoneNumber: "",
-  departmentId: undefined,
+  departmentId: "", // FIX: Initialize as an empty string
 };
 
 export function SdmDashboard() {
   const [activeTab, setActiveTab] = useState("personnel");
   const [persons, setPersons] = useState<Person[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]); // State for departments
-  const [caseReports, setCaseReports] = useState<Report[]>([]); // State for reports of a selected case
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [caseReports, setCaseReports] = useState<Report[]>([]);
   const [reportFeedbacks, setReportFeedbacks] = useState<
     Record<number, string>
-  >({}); // State for feedback on reports
-
+  >({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Modal and Drawer States
@@ -144,7 +145,7 @@ export function SdmDashboard() {
       const [personData, caseData, departmentData] = await Promise.all([
         personService.getAll().catch(() => []),
         caseService.getAll().catch(() => []),
-        departmentService.getAll().catch(() => []), // Fetch departments
+        departmentService.getAll().catch(() => []),
       ]);
       setPersons(personData as Person[]);
       setCases(caseData as Case[]);
@@ -166,13 +167,11 @@ export function SdmDashboard() {
     fetchData();
   }, [fetchData]);
 
-  // Create a map for quick person lookup by ID
   const personMap = useMemo(
     () => new Map(persons.map((p) => [p.id, p])),
     [persons]
   );
 
-  // Memoized filtering logic for personnel
   const filteredPersons = useMemo(
     () =>
       persons.filter(
@@ -195,16 +194,23 @@ export function SdmDashboard() {
 
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!personForm.email || !personForm.password || !personForm.address) {
+    // FIX: Add validation for departmentId
+    if (
+      !personForm.email ||
+      !personForm.password ||
+      !personForm.address ||
+      !personForm.departmentId
+    ) {
       setInfoModal({
         isOpen: true,
         title: "Validation Error",
-        message: "Please fill all required fields.",
+        message: "Please fill all required fields, including department.",
         isError: true,
       });
       return;
     }
     try {
+      // FIX: The payload now correctly matches CreatePersonRequest
       await personService.create({ ...personForm, role: "MEMBER" });
       await fetchData(true);
       setIsPersonModalOpen(false);
@@ -243,16 +249,41 @@ export function SdmDashboard() {
       setIsReportsModalOpen(true);
     } catch (err) {
       console.error("Failed to fetch reports:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Could not fetch reports for this case.",
-        isError: true,
+      toast.error("Error", {
+        description: "Could not fetch reports for this case.",
       });
     }
   };
 
-  // --- RENDER METHODS --- //
+  const handleFeedbackSubmit = async () => {
+    const feedbackPromises = Object.entries(reportFeedbacks)
+      .filter(([, feedbackText]) => feedbackText.trim() !== "")
+      .map(([reportIdStr, sdmFeedback]) => {
+        const reportId = parseInt(reportIdStr, 10);
+        return reportService.update(reportId, { sdmFeedback });
+      });
+
+    if (feedbackPromises.length === 0) {
+      toast.info("No Feedback to Submit", {
+        description: "Please write some feedback before submitting.",
+      });
+      return;
+    }
+
+    try {
+      await Promise.all(feedbackPromises);
+      toast.success("Success!", {
+        description: "All feedback has been submitted successfully.",
+      });
+      setIsReportsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+      toast.error("Submission Failed", {
+        description: "An error occurred while submitting feedback.",
+      });
+    }
+  };
+
   const Sidebar = (
     <nav className="p-4 bg-gray-50 h-full dark:bg-gray-900">
       <div className="space-y-2">
@@ -394,7 +425,7 @@ export function SdmDashboard() {
             <DialogTitle>Add New Person</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
-            {/* Form fields remain the same */}
+            {/* Form fields */}
             <div>
               <Label htmlFor="person-fname">First Name</Label>
               <Input
@@ -487,6 +518,31 @@ export function SdmDashboard() {
                   {TRIPURA_SUBDIVISIONS.map((subdivision) => (
                     <SelectItem key={subdivision} value={subdivision}>
                       {subdivision}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* FIX: Add Department Select */}
+            <div>
+              <Label htmlFor="person-department">Department</Label>
+              <Select
+                required
+                value={personForm.departmentId}
+                onValueChange={(value) =>
+                  setPersonForm((p) => ({
+                    ...p,
+                    departmentId: value as string,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -664,12 +720,13 @@ export function SdmDashboard() {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={() => setIsReportsModalOpen(false)}>Close</Button>
             <Button
-              onClick={() => alert("Feedback submission logic goes here.")}
+              variant="outline"
+              onClick={() => setIsReportsModalOpen(false)}
             >
-              Submit All Feedback
+              Close
             </Button>
+            <Button onClick={handleFeedbackSubmit}>Submit All Feedback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

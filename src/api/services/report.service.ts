@@ -10,6 +10,7 @@ export interface CreateReportRequest {
 
 export interface UpdateReportRequest {
     content?: string;
+    sdmFeedback?: string;
 }
 
 export class ReportService extends BaseApiService {
@@ -37,7 +38,6 @@ export class ReportService extends BaseApiService {
   }
   
   /**
-   * ✅ ADDED: New method to get reports by the person who submitted them.
    * This is required by the PersonDashboard.
    */
   async getByPersonId(personId: string): Promise<Report[]> {
