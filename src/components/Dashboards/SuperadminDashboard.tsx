@@ -30,18 +30,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerClose,
-} from "@/components/ui/drawer";
-import {
   Settings,
   Users,
-  Shield,
   Briefcase,
   Plus,
   Trash2,
@@ -58,13 +48,17 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "../ui/sonner";
 
 // API Service Imports
 import {
   departmentService,
   type CreateDepartmentRequest,
 } from "@/api/services/department.service";
-import { personService } from "@/api/services/person.service";
+import {
+  personService,
+  type CreatePersonRequest,
+} from "@/api/services/person.service";
 import { caseService } from "@/api/services/case.service";
 import { reportService } from "@/api/services/report.service";
 import { teamFormationService } from "@/api/services/team-formation.service";
@@ -73,27 +67,44 @@ import { postService } from "@/api/services/post.service";
 // Type Definitions
 import type {
   Department,
-  Person as BasePerson,
-  Case as BaseCase,
+  Person,
+  Case,
   TeamFormation,
   Report,
   Post,
 } from "@/types";
 
+// --- DATA MAPPERS ---
+const mapApiCaseToStateCase = (apiCase: any): Case => {
+  const details = apiCase.caseDetails?.[0];
+  return {
+    ...apiCase,
+    complainantName: details?.girlName || "Unknown Complainant",
+    description: `Case involving ${details?.girlName || "N/A"} at ${
+      details?.marriageAddress || "N/A"
+    }.`,
+    district: details?.girlSubdivision || "Unknown District",
+    caseAddress: details?.girlAddress || "No address provided",
+    subdivision: details?.girlSubdivision || "Unknown",
+  };
+};
+
+const mapApiPersonToStatePerson = (
+  apiPerson: any,
+  departments: Department[]
+): Person => {
+  const dept = departments.find(
+    (d) => d.name.toLowerCase() === apiPerson.department?.toLowerCase()
+  );
+  return {
+    ...apiPerson,
+    departmentId: dept ? dept.id : undefined,
+  };
+};
+
 // Local Component Types
-interface Person extends BasePerson {
-  departmentId?: string;
-  role: "MEMBER" | "SUPERVISOR" | "SUPERADMIN";
-}
-interface EnrichedCase extends BaseCase {
-  id: string;
-  title: string;
-  description: string;
-  departmentId: string;
-  complainantName: string;
+interface EnrichedCase extends Case {
   subdivision: string;
-  status: string;
-  reportedAt: string;
 }
 interface CaseDetails extends EnrichedCase {
   reports: Report[];
@@ -103,13 +114,6 @@ interface ActivityLogEntry {
   id: number;
   timestamp: string;
   activity: string;
-  actor?: string;
-}
-interface InfoModalState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  isError?: boolean;
 }
 interface ConfirmationModalState {
   isOpen: boolean;
@@ -147,8 +151,7 @@ const TRIPURA_SUBDIVISIONS = [
   "Kailasahar",
   "Kumarghat",
 ];
-
-const INITIAL_PERSON_FORM_STATE = {
+const INITIAL_PERSON_FORM_STATE: Omit<CreatePersonRequest, "role"> = {
   firstName: "",
   lastName: "",
   email: "",
@@ -165,14 +168,7 @@ const INITIAL_DEPARTMENT_FORM_STATE: CreateDepartmentRequest = {
   name: "",
   district: "Sadar",
 };
-const INITIAL_CASE_FORM_STATE = {
-  title: "",
-  description: "",
-  departmentId: "",
-  createdBy: "00000000-0000-0000-0000-000000000000",
-};
 const INITIAL_POST_FORM_STATE = { postName: "", departmentId: "", rank: 0 };
-
 const getDeptCategory = (
   deptName: string
 ): "POLICE" | "DICE" | "ADMINISTRATION" | null => {
@@ -195,9 +191,8 @@ export function SuperadminDashboard() {
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
-  const [isPersonDrawerOpen, setIsPersonDrawerOpen] = useState(false);
+  const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
-  const [isCreateCaseModalOpen, setIsCreateCaseModalOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [editPersonState, setEditPersonState] = useState<EditPersonState>({
     isOpen: false,
@@ -205,11 +200,6 @@ export function SuperadminDashboard() {
   });
   const [selectedCaseDetails, setSelectedCaseDetails] =
     useState<CaseDetails | null>(null);
-  const [infoModal, setInfoModal] = useState<InfoModalState>({
-    isOpen: false,
-    title: "",
-    message: "",
-  });
   const [confirmationModal, setConfirmationModal] =
     useState<ConfirmationModalState>({
       isOpen: false,
@@ -228,7 +218,6 @@ export function SuperadminDashboard() {
     INITIAL_DEPARTMENT_FORM_STATE
   );
   const [personForm, setPersonForm] = useState(INITIAL_PERSON_FORM_STATE);
-  const [caseForm, setCaseForm] = useState(INITIAL_CASE_FORM_STATE);
   const [postForm, setPostForm] = useState(INITIAL_POST_FORM_STATE);
   const [editPersonForm, setEditPersonForm] = useState({
     firstName: "",
@@ -243,8 +232,8 @@ export function SuperadminDashboard() {
   const [searchedCase, setSearchedCase] = useState<EnrichedCase | null>(null);
 
   const fetchData = useCallback(async (refresh = false) => {
+    if (!refresh) setIsLoading(true);
     try {
-      if (!refresh) setIsLoading(true);
       const [deptResult, personResult, caseResult, postResult] =
         await Promise.all([
           departmentService.getAll().catch(() => []),
@@ -252,31 +241,33 @@ export function SuperadminDashboard() {
           caseService.getAll().catch(() => []),
           postService.getAll().catch(() => []),
         ]);
-      setDepartments(deptResult);
-      setPersons(personResult as Person[]);
-      setCases(caseResult as EnrichedCase[]);
+
+      const fetchedDepartments = deptResult as Department[];
+      const mappedPersons = personResult.map((p) =>
+        mapApiPersonToStatePerson(p, fetchedDepartments)
+      );
+      const mappedCases = caseResult.map(
+        mapApiCaseToStateCase
+      ) as EnrichedCase[];
+
+      setDepartments(fetchedDepartments);
+      setPersons(mappedPersons);
+      setCases(mappedCases);
       setPosts(postResult);
+
       if (!refresh) {
         setActivityLog([
           {
             id: Date.now(),
             timestamp: new Date().toISOString(),
-            activity: "Dashboard data loaded successfully.",
-          },
-          {
-            id: Date.now() + 1,
-            timestamp: new Date().toISOString(),
-            activity: `Found ${deptResult.length} departments, ${personResult.length} personnel, and ${postResult.length} posts.`,
+            activity: "Dashboard data loaded.",
           },
         ]);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Connection Error",
-        message: "Failed to connect to the server.",
-        isError: true,
+      toast.error("Connection Error", {
+        description: "Failed to connect to the server.",
       });
     } finally {
       setIsLoading(false);
@@ -294,24 +285,6 @@ export function SuperadminDashboard() {
   const personMap = useMemo(
     () => new Map(persons.map((p) => [p.id, p])),
     [persons]
-  );
-  const caseStats = useMemo(
-    () =>
-      cases.reduce(
-        (acc, c) => {
-          acc.total++;
-          if (
-            c.status.toLowerCase().includes("investigating") ||
-            c.status.toLowerCase().includes("reported")
-          )
-            acc.active++;
-          else if (c.status.toLowerCase().includes("closed")) acc.resolved++;
-          else acc.pending++;
-          return acc;
-        },
-        { total: 0, active: 0, resolved: 0, pending: 0 }
-      ),
-    [cases]
   );
   const postStats = useMemo(
     () =>
@@ -342,77 +315,9 @@ export function SuperadminDashboard() {
       await fetchData(true);
       setIsDepartmentModalOpen(false);
       setDepartmentForm(INITIAL_DEPARTMENT_FORM_STATE);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "New department added successfully.",
-      });
+      toast.success("Success", { description: "New department added." });
     } catch (err) {
-      console.error("Failed to add department:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to add department.",
-        isError: true,
-      });
-    }
-  };
-
-  const handleAddPost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!postForm.postName || !postForm.departmentId || postForm.rank <= 0) {
-      setInfoModal({
-        isOpen: true,
-        title: "Validation Error",
-        message: "Please fill all fields and provide a valid rank.",
-        isError: true,
-      });
-      return;
-    }
-    const selectedDept = departments.find(
-      (d) => d.id === postForm.departmentId
-    );
-    if (!selectedDept) {
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "The selected department could not be found.",
-        isError: true,
-      });
-      return;
-    }
-    const departmentCategory = getDeptCategory(selectedDept.name);
-    if (!departmentCategory) {
-      setInfoModal({
-        isOpen: true,
-        title: "Unrecognized Department Type",
-        message: `Could not determine the category for "${selectedDept.name}". Please ensure the department name contains 'Police', 'DISE', or 'Admin' to assign it a post category.`,
-        isError: true,
-      });
-      return;
-    }
-    try {
-      await postService.create({
-        postName: postForm.postName,
-        department: departmentCategory,
-        rank: postForm.rank,
-      });
-      await fetchData(true);
-      setIsPostModalOpen(false);
-      setPostForm(INITIAL_POST_FORM_STATE);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "New post created successfully.",
-      });
-    } catch (err) {
-      console.error("Failed to add post:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to create new post.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to add department." });
     }
   };
 
@@ -424,19 +329,9 @@ export function SuperadminDashboard() {
         setActiveTab("overview");
         setSelectedDepartment(null);
       }
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "Department deleted successfully.",
-      });
+      toast.success("Success", { description: "Department deleted." });
     } catch (err) {
-      console.error("Failed to delete department:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to delete department.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to delete department." });
     }
   };
 
@@ -444,107 +339,36 @@ export function SuperadminDashboard() {
     setConfirmationModal({
       isOpen: true,
       title: "Confirm Deletion",
-      message: "Are you sure you want to delete this department?",
+      message: "Are you sure? This action cannot be undone.",
       onConfirm: () => handleDeleteDepartment(departmentId),
     });
   };
 
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      departmentId,
-      subdivision,
-      gender,
-      phoneNumber,
-      address,
-      designation,
-      rank,
-    } = personForm;
-
     if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !departmentId ||
-      !subdivision ||
-      !gender ||
-      !phoneNumber ||
-      !address ||
-      !designation
+      !personForm.firstName ||
+      !personForm.lastName ||
+      !personForm.email ||
+      !personForm.password ||
+      !personForm.departmentId
     ) {
-      setInfoModal({
-        isOpen: true,
-        title: "Validation Error",
-        message: "Please fill out all required fields.",
-        isError: true,
+      toast.error("Validation Error", {
+        description: "Please fill out all required fields.",
       });
       return;
     }
-
-    const selectedDept = departments.find((d) => d.id === departmentId);
-    if (!selectedDept) {
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Selected department not found.",
-        isError: true,
-      });
-      return;
-    }
-
-    const departmentCategory = getDeptCategory(selectedDept.name);
-    if (!departmentCategory) {
-      setInfoModal({
-        isOpen: true,
-        title: "Unrecognized Department Type",
-        message: `Could not determine the category for "${selectedDept.name}".`,
-        isError: true,
-      });
-      return;
-    }
-
-    // --- REVERSED PAYLOAD LOGIC ---
-    const payload = {
-      firstName,
-      lastName,
-      email,
-      password,
-      departmentId,
-      role: personModalType === "police" ? "SUPERVISOR" : "MEMBER",
-      address,
-      gender,
-      phoneNumber,
-      subdivision,
-      designation,
-      department: selectedDept.name, // CRITICAL FIX: 'department' now gets the specific office name.
-      officeName: departmentCategory, // CRITICAL FIX: 'officeName' now gets the category string.
-      status: "ACTIVE",
-      rank,
-    };
-
     try {
-      await personService.create(payload as any);
+      await personService.create({
+        ...personForm,
+        role: personModalType === "police" ? "SUPERVISOR" : "MEMBER",
+      });
       await fetchData(true);
-      setIsPersonDrawerOpen(false);
+      setIsPersonModalOpen(false);
       setPersonForm(INITIAL_PERSON_FORM_STATE);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: `New ${personModalType} added successfully.`,
-      });
+      toast.success("Success", { description: "New person added." });
     } catch (err) {
-      console.error("Failed to add person:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: `Failed to add ${personModalType}. Check console for details.`,
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to add person." });
     }
   };
 
@@ -560,19 +384,9 @@ export function SuperadminDashboard() {
       });
       await fetchData(true);
       setEditPersonState({ isOpen: false, person: null });
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "Personnel details updated successfully.",
-      });
+      toast.success("Success", { description: "Personnel details updated." });
     } catch (err) {
-      console.error("Failed to update person:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to update personnel details.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to update details." });
     }
   };
 
@@ -580,19 +394,9 @@ export function SuperadminDashboard() {
     try {
       await personService.deletePerson(personId);
       await fetchData(true);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "Personnel deleted successfully.",
-      });
+      toast.success("Success", { description: "Personnel deleted." });
     } catch (err) {
-      console.error("Failed to delete person:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to delete personnel.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to delete personnel." });
     }
   };
 
@@ -605,58 +409,19 @@ export function SuperadminDashboard() {
     });
   };
 
-  const handleCreateCase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!caseForm.title || !caseForm.description || !caseForm.departmentId)
-      return;
-    try {
-      await caseService.create({
-        title: caseForm.title,
-        description: caseForm.description,
-        departmentId: caseForm.departmentId,
-        createdBy: caseForm.createdBy,
-        status: "pending",
-      });
-      await fetchData(true);
-      setIsCreateCaseModalOpen(false);
-      setCaseForm(INITIAL_CASE_FORM_STATE);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "New case created successfully.",
-      });
-    } catch (err) {
-      console.error("Failed to create case:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to create new case.",
-        isError: true,
-      });
-    }
-  };
-
-  const openPersonDrawer = (type: "person" | "police", deptId?: string) => {
+  const openPersonModal = (type: "person" | "police", deptId?: string) => {
     setPersonModalType(type);
     setPersonForm({ ...INITIAL_PERSON_FORM_STATE, departmentId: deptId || "" });
-    setIsPersonDrawerOpen(true);
-  };
-
-  const openPostModal = (department?: Department) => {
-    setPostForm({
-      ...INITIAL_POST_FORM_STATE,
-      departmentId: department ? department.id : "",
-    });
-    setIsPostModalOpen(true);
+    setIsPersonModalOpen(true);
   };
 
   const openEditPersonModal = (person: Person) => {
-    setEditPersonState({ isOpen: true, person: person });
+    setEditPersonState({ isOpen: true, person });
     setEditPersonForm({
       firstName: person.firstName,
       lastName: person.lastName,
       email: person.email,
-      role: person.role || "MEMBER",
+      role: person.role as any,
     });
   };
 
@@ -673,40 +438,55 @@ export function SuperadminDashboard() {
       });
       setIsIssueModalOpen(true);
     } catch (err) {
-      console.error("Failed to fetch case details:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to load case details.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to load case details." });
     }
   };
 
-  const handleCaseSearch = async () => {
-    if (!caseIdSearch.trim()) return;
-    setIsLoading(true);
+  const handleAddPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postForm.postName || !postForm.departmentId || postForm.rank <= 0) {
+      toast.error("Validation Error", {
+        description: "Please fill all fields and provide a valid rank.",
+      });
+      return;
+    }
+    const selectedDept = departments.find(
+      (d) => d.id === postForm.departmentId
+    );
+    if (!selectedDept) {
+      toast.error("Error", {
+        description: "Selected department could not be found.",
+      });
+      return;
+    }
+    const departmentCategory = getDeptCategory(selectedDept.name);
+    if (!departmentCategory) {
+      toast.error("Unrecognized Department Type", {
+        description: `Could not determine category for "${selectedDept.name}".`,
+      });
+      return;
+    }
     try {
-      const foundCase = (await caseService.getById(
-        caseIdSearch.trim()
-      )) as EnrichedCase;
-      setSearchedCase(foundCase);
-    } catch (error) {
-      setSearchedCase(null);
-      setInfoModal({
-        isOpen: true,
-        title: "Not Found",
-        message: `Case with ID "${caseIdSearch}" was not found.`,
-        isError: true,
+      await postService.create({
+        postName: postForm.postName,
+        department: departmentCategory,
+        rank: postForm.rank,
       });
-    } finally {
-      setIsLoading(false);
+      await fetchData(true);
+      setIsPostModalOpen(false);
+      setPostForm(INITIAL_POST_FORM_STATE);
+      toast.success("Success", { description: "New post created." });
+    } catch (err) {
+      toast.error("Error", { description: "Failed to create new post." });
     }
   };
 
-  const clearCaseSearch = () => {
-    setCaseIdSearch("");
-    setSearchedCase(null);
+  const openPostModal = (department?: Department) => {
+    setPostForm({
+      ...INITIAL_POST_FORM_STATE,
+      departmentId: department ? department.id : "",
+    });
+    setIsPostModalOpen(true);
   };
 
   const renderLoadingSkeletons = () => (
@@ -816,7 +596,6 @@ export function SuperadminDashboard() {
   const renderDepartmentDetails = () => {
     const dept = departments.find((d) => d.id === selectedDepartment);
     if (!dept) return <div>Department not found.</div>;
-    const departmentCategory = getDeptCategory(dept.name);
     const deptMembers = persons.filter(
       (p) =>
         p.departmentId === dept.id &&
@@ -824,12 +603,6 @@ export function SuperadminDashboard() {
           .toLowerCase()
           .includes(memberSearchTerm.toLowerCase())
     );
-    const deptCases = cases.filter(
-      (c) => c.departmentId === selectedDepartment
-    );
-    const deptPosts = departmentCategory
-      ? posts.filter((p) => p.department === departmentCategory)
-      : [];
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -837,7 +610,7 @@ export function SuperadminDashboard() {
             <Building /> {dept.name}
           </h2>
           <div className="flex gap-2">
-            <Button onClick={() => openPersonDrawer("person", dept.id)}>
+            <Button onClick={() => openPersonModal("person", dept.id)}>
               <UserPlus className="h-4 w-4 mr-2" /> Add Personnel
             </Button>
             <Button onClick={() => openPostModal(dept)}>
@@ -845,34 +618,6 @@ export function SuperadminDashboard() {
             </Button>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Posts</CardTitle>
-            <CardDescription>
-              Generic posts available to this department type.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {deptPosts.length > 0 ? (
-                deptPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="flex justify-between items-center p-2 border rounded"
-                  >
-                    <span className="font-medium">{post.postName}</span>
-                    <Badge>Rank: {post.rank}</Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500 py-4">
-                  No posts found for this department type. Add one from the main
-                  "Posts" menu.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Personnel</CardTitle>
@@ -894,14 +639,21 @@ export function SuperadminDashboard() {
                   key={member.id}
                   className="flex items-center justify-between p-4"
                 >
-                  <div>
+                  <div className="space-y-1">
                     <h4 className="font-semibold">{`${member.firstName} ${member.lastName}`}</h4>
                     <p className="text-sm text-gray-600">{member.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Designation:</strong>{" "}
+                      {member.designation || "N/A"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Rank:</strong> {member.rank || "N/A"}
+                    </p>
                     <Badge
                       variant={
                         member.role === "SUPERVISOR" ? "default" : "secondary"
                       }
-                      className="mt-1 capitalize"
+                      className="capitalize"
                     >
                       {member.role?.toLowerCase()}
                     </Badge>
@@ -915,7 +667,7 @@ export function SuperadminDashboard() {
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="destructive"
                       size="icon"
                       onClick={() => confirmDeletePerson(member.id)}
                     >
@@ -926,53 +678,10 @@ export function SuperadminDashboard() {
               ))}
               {deptMembers.length === 0 && (
                 <p className="text-center text-gray-500 py-4">
-                  No personnel found for this department.
+                  No personnel found.
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Assigned Cases</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {deptCases.length > 0 ? (
-              deptCases.map((caseItem) => (
-                <Card
-                  key={caseItem.id}
-                  className="mb-2 p-4 flex justify-between items-center"
-                >
-                  <div>
-                    <h4 className="font-semibold">{caseItem.title}</h4>
-                    <p className="text-sm text-gray-500">
-                      Status:{" "}
-                      <Badge
-                        variant={
-                          caseItem.status === "active"
-                            ? "destructive"
-                            : caseItem.status === "resolved"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {caseItem.status}
-                      </Badge>
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => openIssueDetailsModal(caseItem)}
-                  >
-                    View Details
-                  </Button>
-                </Card>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 py-4">
-                No cases assigned.
-              </p>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -984,26 +693,23 @@ export function SuperadminDashboard() {
   ) => {
     const casesToDisplay = (searchedCase ? [searchedCase] : cases).filter(
       (c) => {
-        if (!c) return false;
         const caseStatus = c.status.toLowerCase();
         let matchesStatus = false;
-        if (statusString === "active") {
-          matchesStatus =
-            caseStatus.includes("investigating") ||
-            caseStatus.includes("reported");
-        } else if (statusString === "resolved") {
+        if (statusString === "active")
+          matchesStatus = caseStatus.includes("investigating");
+        else if (statusString === "resolved")
           matchesStatus = caseStatus.includes("closed");
-        } else if (statusString === "pending") {
-          matchesStatus = !["investigating", "reported", "closed"].some((s) =>
-            caseStatus.includes(s)
-          );
-        }
+        else if (statusString === "pending")
+          matchesStatus = caseStatus.includes("reported");
+
         if (searchedCase) return matchesStatus;
         return (
           matchesStatus &&
           (locationFilter === "all" ||
-            (c.subdivision && c.subdivision === locationFilter)) &&
-          c.complainantName &&
+            (c.district &&
+              c.district
+                .toLowerCase()
+                .includes(locationFilter.toLowerCase()))) &&
           c.complainantName
             .toLowerCase()
             .includes(issueSearchTerm.toLowerCase())
@@ -1029,7 +735,7 @@ export function SuperadminDashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sub-Divisions</SelectItem>
-                {[...new Set(cases.map((c) => c.subdivision))]
+                {[...new Set(cases.map((c) => c.district))]
                   .filter(Boolean)
                   .map((dist) => (
                     <SelectItem key={dist} value={dist}>
@@ -1038,31 +744,8 @@ export function SuperadminDashboard() {
                   ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setIsCreateCaseModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Create Case
-            </Button>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Find Case by ID</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2">
-            <Input
-              placeholder="Enter full Case ID (UUID)..."
-              value={caseIdSearch}
-              onChange={(e) => setCaseIdSearch(e.target.value)}
-            />
-            <Button onClick={handleCaseSearch}>
-              <Search className="h-4 w-4 mr-2" /> Find
-            </Button>
-            {searchedCase && (
-              <Button variant="outline" onClick={clearCaseSearch}>
-                Clear Search
-              </Button>
-            )}
-          </CardContent>
-        </Card>
         <div className="space-y-4">
           {casesToDisplay.length > 0 ? (
             casesToDisplay.map((caseItem) => (
@@ -1073,7 +756,7 @@ export function SuperadminDashboard() {
                       Complainant: {caseItem.complainantName}
                     </h3>
                     <div className="text-sm text-gray-600 mt-1">
-                      <Badge variant="secondary">{caseItem.subdivision}</Badge>
+                      <Badge variant="secondary">{caseItem.district}</Badge>
                       <Badge variant="outline" className="ml-2">
                         {caseItem.status}
                       </Badge>
@@ -1095,7 +778,7 @@ export function SuperadminDashboard() {
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-gray-500">
-                No {statusString} issues found for the selected filters.
+                No {statusString} issues found.
               </CardContent>
             </Card>
           )}
@@ -1193,17 +876,9 @@ export function SuperadminDashboard() {
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-xs gap-2"
-                      onClick={() => openPersonDrawer("police", dept.id)}
+                      onClick={() => openPersonModal("person", dept.id)}
                     >
                       <UserPlus className="h-3 w-3" /> Add Personnel
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start text-xs gap-2"
-                      onClick={() => openPostModal(dept)}
-                    >
-                      <Briefcase className="h-3 w-3" /> Add Post
                     </Button>
                     <Button
                       variant="ghost"
@@ -1258,86 +933,24 @@ export function SuperadminDashboard() {
     <DashboardLayout title="Superadmin Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
 
-      <Dialog
-        open={infoModal.isOpen}
-        onOpenChange={() => setInfoModal((p) => ({ ...p, isOpen: false }))}
-      >
-        <DialogContent>
+      <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {infoModal.isError ? (
-                <AlertCircle className="text-red-500" />
-              ) : (
-                <CheckCircle className="text-green-500" />
-              )}
-              {infoModal.title}
-            </DialogTitle>
-            <DialogDescription>{infoModal.message}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => setInfoModal((p) => ({ ...p, isOpen: false }))}
-            >
-              OK
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={confirmationModal.isOpen}
-        onOpenChange={() =>
-          setConfirmationModal((p) => ({ ...p, isOpen: false }))
-        }
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{confirmationModal.title}</DialogTitle>
-            <DialogDescription>{confirmationModal.message}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setConfirmationModal((p) => ({ ...p, isOpen: false }))
-              }
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                confirmationModal.onConfirm();
-                setConfirmationModal((p) => ({ ...p, isOpen: false }));
-              }}
-            >
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Drawer
-        direction="right"
-        open={isPersonDrawerOpen}
-        onOpenChange={setIsPersonDrawerOpen}
-      >
-        <DrawerContent className="w-full md:w-1/2 lg:w-1/3 h-screen mt-0 flex flex-col">
-          <DrawerHeader className="p-4 border-b">
-            <DrawerTitle>
+            <DialogTitle>
               Add New{" "}
               {personModalType === "police" ? "Police Officer" : "Personnel"}
-            </DrawerTitle>
-            <DrawerDescription>
-              Fill out the form below to add a new person to the system.
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="flex-grow p-4 overflow-y-auto">
+            </DialogTitle>
+            <DialogDescription>
+              Fill out the form below. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[70vh] overflow-y-auto pr-4">
             <form onSubmit={handleAddPerson} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="person-fname">First Name</Label>
+                  <Label htmlFor="sa-person-fname">First Name</Label>
                   <Input
-                    id="person-fname"
+                    id="sa-person-fname"
                     value={personForm.firstName}
                     onChange={(e) =>
                       setPersonForm((p) => ({
@@ -1349,9 +962,9 @@ export function SuperadminDashboard() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="person-lname">Last Name</Label>
+                  <Label htmlFor="sa-person-lname">Last Name</Label>
                   <Input
-                    id="person-lname"
+                    id="sa-person-lname"
                     value={personForm.lastName}
                     onChange={(e) =>
                       setPersonForm((p) => ({ ...p, lastName: e.target.value }))
@@ -1361,9 +974,9 @@ export function SuperadminDashboard() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="person-email">Email</Label>
+                <Label htmlFor="sa-person-email">Email</Label>
                 <Input
-                  id="person-email"
+                  id="sa-person-email"
                   type="email"
                   value={personForm.email}
                   onChange={(e) =>
@@ -1373,9 +986,9 @@ export function SuperadminDashboard() {
                 />
               </div>
               <div>
-                <Label htmlFor="person-password">Temporary Password</Label>
+                <Label htmlFor="sa-person-password">Password</Label>
                 <Input
-                  id="person-password"
+                  id="sa-person-password"
                   type="password"
                   value={personForm.password}
                   onChange={(e) =>
@@ -1385,9 +998,9 @@ export function SuperadminDashboard() {
                 />
               </div>
               <div>
-                <Label htmlFor="person-phone">Phone Number</Label>
+                <Label htmlFor="sa-person-phone">Phone Number</Label>
                 <Input
-                  id="person-phone"
+                  id="sa-person-phone"
                   value={personForm.phoneNumber}
                   onChange={(e) =>
                     setPersonForm((p) => ({
@@ -1398,9 +1011,9 @@ export function SuperadminDashboard() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="person-gender">Gender</Label>
+                  <Label htmlFor="sa-person-gender">Gender</Label>
                   <Select
                     required
                     value={personForm.gender}
@@ -1409,7 +1022,7 @@ export function SuperadminDashboard() {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Male">Male</SelectItem>
@@ -1419,26 +1032,25 @@ export function SuperadminDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="person-rank">Rank</Label>
+                  <Label htmlFor="sa-person-rank">Rank</Label>
                   <Input
-                    id="person-rank"
+                    id="sa-person-rank"
                     type="number"
-                    value={personForm.rank}
+                    value={personForm.rank || ""}
                     onChange={(e) =>
                       setPersonForm((p) => ({
                         ...p,
                         rank: parseInt(e.target.value, 10) || 0,
                       }))
                     }
-                    placeholder="e.g., 5"
                     required
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="person-designation">Designation</Label>
+                <Label htmlFor="sa-person-designation">Designation</Label>
                 <Input
-                  id="person-designation"
+                  id="sa-person-designation"
                   value={personForm.designation}
                   onChange={(e) =>
                     setPersonForm((p) => ({
@@ -1446,14 +1058,13 @@ export function SuperadminDashboard() {
                       designation: e.target.value,
                     }))
                   }
-                  placeholder="e.g., Officer In-charge"
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="person-address">Full Address</Label>
+                <Label htmlFor="sa-person-address">Full Address</Label>
                 <Textarea
-                  id="person-address"
+                  id="sa-person-address"
                   value={personForm.address}
                   onChange={(e) =>
                     setPersonForm((p) => ({ ...p, address: e.target.value }))
@@ -1462,7 +1073,7 @@ export function SuperadminDashboard() {
                 />
               </div>
               <div>
-                <Label htmlFor="person-subdivision">Sub-Division</Label>
+                <Label htmlFor="sa-person-subdivision">Sub-Division</Label>
                 <Select
                   required
                   value={personForm.subdivision}
@@ -1471,19 +1082,19 @@ export function SuperadminDashboard() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a subdivision" />
+                    <SelectValue placeholder="Select subdivision..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {TRIPURA_SUBDIVISIONS.map((subdivision) => (
-                      <SelectItem key={subdivision} value={subdivision}>
-                        {subdivision}
+                    {TRIPURA_SUBDIVISIONS.map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="person-dept">Department (Office)</Label>
+                <Label htmlFor="sa-person-dept">Department</Label>
                 <Select
                   required
                   value={personForm.departmentId}
@@ -1492,29 +1103,31 @@ export function SuperadminDashboard() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder="Select department..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <DrawerFooter className="flex-row gap-4 px-0 pt-4">
-                <Button type="submit" className="w-full">
-                  Add Person
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPersonModalOpen(false)}
+                >
+                  Cancel
                 </Button>
-                <DrawerClose asChild className="w-full">
-                  <Button variant="outline">Cancel</Button>
-                </DrawerClose>
-              </DrawerFooter>
+                <Button type="submit">Add Person</Button>
+              </DialogFooter>
             </form>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isDepartmentModalOpen}
@@ -1557,8 +1170,7 @@ export function SuperadminDashboard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Edit Personnel:{" "}
-              {`${editPersonState.person?.firstName} ${editPersonState.person?.lastName}`}
+              Edit Personnel: {editPersonState.person?.firstName}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditPerson} className="space-y-4 py-4">
@@ -1605,10 +1217,7 @@ export function SuperadminDashboard() {
                 required
                 value={editPersonForm.role}
                 onValueChange={(value) =>
-                  setEditPersonForm((p) => ({
-                    ...p,
-                    role: value as "MEMBER" | "SUPERVISOR" | "SUPERADMIN",
-                  }))
+                  setEditPersonForm((p) => ({ ...p, role: value as any }))
                 }
               >
                 <SelectTrigger>
@@ -1636,79 +1245,10 @@ export function SuperadminDashboard() {
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={isCreateCaseModalOpen}
-        onOpenChange={setIsCreateCaseModalOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Case</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateCase} className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="case-title">Case Title</Label>
-              <Input
-                id="case-title"
-                value={caseForm.title}
-                onChange={(e) =>
-                  setCaseForm((p) => ({ ...p, title: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="case-desc">Description</Label>
-              <Input
-                id="case-desc"
-                value={caseForm.description}
-                onChange={(e) =>
-                  setCaseForm((p) => ({ ...p, description: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="case-dept">Assign to Department</Label>
-              <Select
-                required
-                value={caseForm.departmentId}
-                onValueChange={(value) =>
-                  setCaseForm((p) => ({ ...p, departmentId: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsCreateCaseModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Create Case</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
       <Dialog open={isPostModalOpen} onOpenChange={setIsPostModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Post</DialogTitle>
-            <DialogDescription>
-              Select a department to associate this post with. The system will
-              automatically assign the correct category.
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddPost} className="space-y-4 py-4">
             <div>
@@ -1719,7 +1259,6 @@ export function SuperadminDashboard() {
                 onChange={(e) =>
                   setPostForm((p) => ({ ...p, postName: e.target.value }))
                 }
-                placeholder="e.g. Constable, Inspector"
                 required
               />
             </div>
@@ -1757,7 +1296,6 @@ export function SuperadminDashboard() {
                   }))
                 }
                 required
-                placeholder="A numeric value for hierarchy"
               />
             </div>
             <DialogFooter>
@@ -1776,77 +1314,114 @@ export function SuperadminDashboard() {
       <Dialog open={isIssueModalOpen} onOpenChange={setIsIssueModalOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{selectedCaseDetails?.title}</DialogTitle>
-            <DialogDescription>
-              Case ID: {selectedCaseDetails?.id} | Status:{" "}
-              <Badge
-                variant={
-                  selectedCaseDetails?.status === "INVESTIGATING"
-                    ? "destructive"
-                    : selectedCaseDetails?.status === "CLOSED"
-                    ? "default"
-                    : "secondary"
-                }
-                className="ml-2"
-              >
-                {selectedCaseDetails?.status}
-              </Badge>
-            </DialogDescription>
+            <DialogTitle>{selectedCaseDetails?.complainantName}</DialogTitle>
+            <DialogDescription>ID: {selectedCaseDetails?.id}</DialogDescription>
           </DialogHeader>
-          <div className="mt-4 space-y-6 max-h-[70vh] overflow-y-auto pr-4">
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Case Description</h3>
-              <p className="text-gray-700">
-                {selectedCaseDetails?.description}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Investigating Team</h3>
-              {selectedCaseDetails?.teamFormation ? (
-                <div className="p-3 border rounded-md mb-2 bg-gray-50">
-                  <h4 className="font-medium">
-                    Team (Formed:{" "}
-                    {selectedCaseDetails.teamFormation.formed_at
-                      ? new Date(
-                          selectedCaseDetails.teamFormation.formed_at
-                        ).toLocaleDateString()
-                      : "N/A"}
-                    )
-                  </h4>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Member IDs:{" "}
-                    {selectedCaseDetails.teamFormation.member_ids.join(", ")}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-500">No team assigned.</p>
-              )}
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Reports</h3>
-              {selectedCaseDetails?.reports.length ?? 0 > 0 ? (
-                selectedCaseDetails?.reports.map((report) => (
-                  <Card key={report.id} className="bg-gray-50 mb-2">
-                    <CardHeader>
-                      <CardTitle className="text-base">
-                        Report by:{" "}
-                        {personMap.get(report.personId)?.firstName || "Unknown"}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p>{report.content}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Submitted:{" "}
-                        {new Date(report.submittedAt).toLocaleString()}
+          <div className="mt-4 space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+            {selectedCaseDetails && selectedCaseDetails.caseDetails?.[0] && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Case Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <Badge>{selectedCaseDetails.status}</Badge>
+                    </p>
+                    <p>
+                      <strong>Description:</strong>{" "}
+                      {selectedCaseDetails.description}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Girl's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCaseDetails.caseDetails[0].girlName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCaseDetails.caseDetails[0].girlAddress}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Boy's Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <strong>Name:</strong>{" "}
+                      {selectedCaseDetails.caseDetails[0].boyName}
+                    </p>
+                    <p>
+                      <strong>Address:</strong>{" "}
+                      {selectedCaseDetails.caseDetails[0].boyAddress}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Reports</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedCaseDetails.reports.length > 0 ? (
+                      selectedCaseDetails.reports.map((r) => (
+                        <div key={r.id} className="text-sm p-2 border-b">
+                          <p>
+                            <strong>From:</strong>{" "}
+                            {personMap.get(r.personId)?.firstName || "Unknown"}
+                          </p>
+                          <p>{r.content}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No reports submitted.
                       </p>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <p className="text-gray-500">No reports submitted.</p>
-              )}
-            </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={confirmationModal.isOpen}
+        onOpenChange={() =>
+          setConfirmationModal((s) => ({ ...s, isOpen: false }))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmationModal.title}</DialogTitle>
+            <DialogDescription>{confirmationModal.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setConfirmationModal((s) => ({ ...s, isOpen: false }))
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                confirmationModal.onConfirm();
+                setConfirmationModal((s) => ({ ...s, isOpen: false }));
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

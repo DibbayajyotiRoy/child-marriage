@@ -60,6 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: "Agartala",
         gender: "Other",
         phoneNumber: "1111111111",
+        officeName: "System Administration",
+        district: "West Tripura",
+        designation: "System Administrator",
+        rank: 1,
       };
       localStorage.setItem("user", JSON.stringify(superAdminUser));
       setUser(superAdminUser);
@@ -80,6 +84,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: "Udaipur",
         gender: "Other",
         phoneNumber: "2222222222",
+        officeName: "SDM Office Udaipur",
+        district: "Gomati",
+        designation: "Sub-Divisional Magistrate",
+        rank: 2,
       };
       localStorage.setItem("user", JSON.stringify(sdmUser));
       setUser(sdmUser);
@@ -100,6 +108,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: "Dharmanagar",
         gender: "Other",
         phoneNumber: "3333333333",
+        officeName: "DM Office North Tripura",
+        district: "North Tripura",
+        designation: "District Magistrate",
+        rank: 1,
       };
       localStorage.setItem("user", JSON.stringify(dmUser));
       setUser(dmUser);
@@ -120,6 +132,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: "Sadar",
         gender: "Other",
         phoneNumber: "4444444444",
+        officeName: "SP Office West Tripura",
+        district: "West Tripura",
+        designation: "Superintendent of Police",
+        rank: 1,
       };
       localStorage.setItem("user", JSON.stringify(spUser));
       setUser(spUser);
