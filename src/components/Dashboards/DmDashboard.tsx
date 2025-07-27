@@ -186,8 +186,13 @@ export function DmDashboard() {
 
   const filteredCases = useMemo(
     () =>
-      cases.filter((c) =>
-        c.complainantName.toLowerCase().includes(issueSearchTerm.toLowerCase())
+      cases.filter(
+        (c) =>
+          c &&
+          c.complainantName &&
+          c.complainantName
+            .toLowerCase()
+            .includes(issueSearchTerm.toLowerCase())
       ),
     [cases, issueSearchTerm]
   );

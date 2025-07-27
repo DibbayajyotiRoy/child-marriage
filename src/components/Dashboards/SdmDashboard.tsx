@@ -43,7 +43,6 @@ import {
   AlertCircle,
   UserPlus,
   Eye,
-  CheckCircle,
   FileText,
   Send,
 } from "lucide-react";
@@ -103,7 +102,7 @@ const INITIAL_PERSON_FORM_STATE: Omit<CreatePersonRequest, "role"> = {
   address: "",
   gender: "Male",
   phoneNumber: "",
-  departmentId: "", // FIX: Initialize as an empty string
+  departmentId: "",
 };
 
 export function SdmDashboard() {
@@ -116,25 +115,18 @@ export function SdmDashboard() {
     Record<number, string>
   >({});
   const [isLoading, setIsLoading] = useState(true);
-
-  // Modal and Drawer States
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [isPersonDetailModalOpen, setIsPersonDetailModalOpen] = useState(false);
   const [isIssueDrawerOpen, setIsIssueDrawerOpen] = useState(false);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
-
-  // State for selected items
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-
   const [infoModal, setInfoModal] = useState<InfoModalState>({
     isOpen: false,
     title: "",
     message: "",
   });
   const [personForm, setPersonForm] = useState(INITIAL_PERSON_FORM_STATE);
-
-  // Search and Filter States
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [issueSearchTerm, setIssueSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
@@ -147,16 +139,38 @@ export function SdmDashboard() {
         caseService.getAll().catch(() => []),
         departmentService.getAll().catch(() => []),
       ]);
-      setPersons(personData as Person[]);
-      setCases(caseData as Case[]);
-      setDepartments(departmentData as Department[]);
+
+      const departments = departmentData as Department[];
+      const departmentMapByName = new Map(
+        departments.map((d) => [d.name.toLowerCase(), d.id])
+      );
+
+      // MAPPER FUNCTION FOR PERSONS
+      const mappedPersons = (personData as Person[]).map((p) => ({
+        ...p,
+        departmentId:
+          departmentMapByName.get(p.officeName?.toLowerCase()) || undefined,
+      }));
+
+      // MAPPER FUNCTION FOR CASES
+      const mappedCases = (caseData as Case[]).map((c) => {
+        const details = c.caseDetails?.[0];
+        return {
+          ...c,
+          complainantName: details?.girlName || "N/A",
+          description: `Case involving ${details?.girlName} and ${details?.boyName}.`,
+          district: details?.girlAddress?.split(",")[1]?.trim() || "Unknown",
+          caseAddress: details?.girlAddress || "Unknown",
+        };
+      });
+
+      setPersons(mappedPersons);
+      setCases(mappedCases);
+      setDepartments(departments);
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Connection Error",
-        message: "Failed to connect to the server.",
-        isError: true,
+      toast.error("Connection Error", {
+        description: "Failed to connect to the server.",
       });
     } finally {
       setIsLoading(false);
@@ -186,48 +200,41 @@ export function SdmDashboard() {
 
   const filteredCases = useMemo(
     () =>
-      cases.filter((c) =>
-        c.complainantName.toLowerCase().includes(issueSearchTerm.toLowerCase())
+      cases.filter(
+        (c) =>
+          c &&
+          c.complainantName &&
+          c.complainantName
+            .toLowerCase()
+            .includes(issueSearchTerm.toLowerCase())
       ),
     [cases, issueSearchTerm]
   );
 
   const handleAddPerson = async (e: React.FormEvent) => {
     e.preventDefault();
-    // FIX: Add validation for departmentId
     if (
       !personForm.email ||
       !personForm.password ||
       !personForm.address ||
       !personForm.departmentId
     ) {
-      setInfoModal({
-        isOpen: true,
-        title: "Validation Error",
-        message: "Please fill all required fields, including department.",
-        isError: true,
+      toast.error("Validation Error", {
+        description: "Please fill all required fields.",
       });
       return;
     }
     try {
-      // FIX: The payload now correctly matches CreatePersonRequest
       await personService.create({ ...personForm, role: "MEMBER" });
       await fetchData(true);
       setIsPersonModalOpen(false);
       setPersonForm(INITIAL_PERSON_FORM_STATE);
-      setInfoModal({
-        isOpen: true,
-        title: "Success",
-        message: "New person added successfully.",
+      toast.success("Success", {
+        description: "New person added successfully.",
       });
     } catch (err) {
       console.error("Failed to add person:", err);
-      setInfoModal({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to add person.",
-        isError: true,
-      });
+      toast.error("Error", { description: "Failed to add new person." });
     }
   };
 
@@ -264,7 +271,7 @@ export function SdmDashboard() {
       });
 
     if (feedbackPromises.length === 0) {
-      toast.info("No Feedback to Submit", {
+      toast.info("No Feedback", {
         description: "Please write some feedback before submitting.",
       });
       return;
@@ -273,7 +280,7 @@ export function SdmDashboard() {
     try {
       await Promise.all(feedbackPromises);
       toast.success("Success!", {
-        description: "All feedback has been submitted successfully.",
+        description: "All feedback has been submitted.",
       });
       setIsReportsModalOpen(false);
     } catch (error) {
@@ -416,8 +423,6 @@ export function SdmDashboard() {
     <DashboardLayout title="SDM Dashboard" sidebar={Sidebar}>
       <div className="p-6">{renderContent()}</div>
 
-      {/* --- MODALS AND DRAWERS --- */}
-
       {/* Add Person Modal */}
       <Dialog open={isPersonModalOpen} onOpenChange={setIsPersonModalOpen}>
         <DialogContent>
@@ -425,7 +430,6 @@ export function SdmDashboard() {
             <DialogTitle>Add New Person</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddPerson} className="space-y-4 py-4">
-            {/* Form fields */}
             <div>
               <Label htmlFor="person-fname">First Name</Label>
               <Input
@@ -523,7 +527,6 @@ export function SdmDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            {/* FIX: Add Department Select */}
             <div>
               <Label htmlFor="person-department">Department</Label>
               <Select
@@ -562,7 +565,7 @@ export function SdmDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Person Full Details Modal */}
+      {/* Other Modals & Drawers remain the same */}
       <Dialog
         open={isPersonDetailModalOpen}
         onOpenChange={setIsPersonDetailModalOpen}
@@ -601,8 +604,6 @@ export function SdmDashboard() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Issue Details Drawer */}
       <Drawer
         direction="left"
         open={isIssueDrawerOpen}
@@ -661,8 +662,6 @@ export function SdmDashboard() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
-      {/* View Reports Modal */}
       <Dialog open={isReportsModalOpen} onOpenChange={setIsReportsModalOpen}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
           <DialogHeader>
